@@ -9,11 +9,6 @@ export class MlClientTools {
     name: 'python_health',
     description: 'Check that the Seer Python ML service is reachable and healthy.',
     inputSchema: z.object({}).strict(),
-    outputSchema: z.object({
-      status: z.literal('healthy'),
-      service: z.literal('seer-ml'),
-      version: z.string(),
-    }),
   })
   async pythonHealth(_input: Record<string, never>, context: ExecutionContext) {
     try {

@@ -1,40 +1,76 @@
 # Seer
 
-Seer is an MCP application for transparent, CSV-based predictive analysis.
-It helps non-technical users profile approved datasets, create and approve a
-supervised-learning plan, and understand the resulting estimate or
-classification.
+> Ask your data. Understand the process. See what comes next.
 
-## Phase 5: hardened regression and classification analysis
+Seer is an MCP application for transparent, CSV-based predictive analysis. It
+helps non-technical users profile approved datasets, explicitly approve a
+supervised-learning plan, and understand a resulting estimate or
+classification. It is designed for the Enterprise AI & Workplace Automation
+use case.
 
-Seer includes approved synthetic employee-compensation regression and
-employee-attrition classification datasets. The MCP server exposes their
-catalogue at `seer://datasets`, their CSV resources, and the `profile_dataset`
-tool.
+Seer supports eligible, fixed CSV datasets; it does not claim to model every
+CSV or establish causal relationships.
 
-The profiler scans the full CSV in the Python service and returns column types,
-missing values, duplicates, candidate targets and identifiers, distributions,
-and data-quality warnings. `create_analysis_plan` then validates the selected
-target, features, task type, and prediction inputs against the packaged CSV.
-It returns a signed approval token valid for 15 minutes. Approving the plan
-calls `run_analysis`, which verifies that token and the packaged CSV, then sends
-the approved plan to the Python service. The service uses an 80/20, seed-42
-split; classification splits are stratified. It fits numeric
-median-imputation/scaling and categorical most-frequent-imputation/one-hot
-encoding only on training data; compares linear regression against a
-training-mean baseline; and compares logistic regression against a
-most-frequent-class baseline. The results widget shows the appropriate
-estimates or classifications, baseline comparison, probabilities and metrics,
-diagnostics, coverage, and limitations.
+## What it does
 
-The datasets are synthetic and committed as runtime resources.
+1. Exposes approved datasets through MCP resources.
+2. Profiles the full CSV for schema, quality, and modelling eligibility.
+3. Validates a regression or classification plan against the dataset.
+4. Issues a signed, 15-minute approval token.
+5. Trains and evaluates the approved plan atomically in the ML service.
+6. Returns evidence, charts, warnings, and prediction coverage to MCP widgets.
 
-### Local setup
+The bundled synthetic datasets demonstrate both supported task types:
 
-1. Copy `.env.example` to `.env`, set a long shared `ML_SERVICE_API_KEY`, and
-   set a different `ANALYSIS_PLAN_TOKEN_SECRET` of at least 32 characters.
-2. In another terminal, install and start the ML service. The checked-in
-   `ml-service/.python-version` constrains uv to Python 3.12.
+| Dataset | Task | Example target |
+| --- | --- | --- |
+| Employee Compensation | Regression | `annual_salary` |
+| Employee Attrition | Classification | `attrition` |
+
+## Supported scope
+
+- One target column with numeric and categorical input features.
+- Linear regression with a `DummyRegressor` baseline.
+- Logistic regression with a `DummyClassifier` baseline.
+- Missing-value imputation, numeric scaling, and categorical one-hot encoding.
+- Train/test evaluation, plot-ready diagnostics, and up to ten prediction rows.
+
+User uploads, databases, time-series, free-text, images, deep learning,
+hyperparameter optimisation, arbitrary Python execution, and model persistence
+are intentionally out of scope.
+
+## Architecture
+
+The TypeScript MCP server runs in NitroCloud and the Python ML service deploys
+independently to Google Cloud Run. The full design and trust boundaries are in
+[the architecture guide](docs/architecture.md).
+
+```mermaid
+flowchart LR
+  U[ChatGPT / NitroStudio] <-- MCP --> M[Seer MCP server\nTypeScript / NitroCloud]
+  M <-- HTTPS + API key --> P[Seer ML service\nFastAPI / Cloud Run]
+  M --> D[Bundled synthetic CSV resources]
+  P --> R[Profile, train, evaluate,\nand chart data]
+  M --> W[NitroStack widgets]
+```
+
+## Local development
+
+Prerequisites: Node.js with npm, and [uv](https://docs.astral.sh/uv/). The
+checked-in [`ml-service/.python-version`](ml-service/.python-version) pins the
+ML service to Python 3.12; use `uv`, not a manually-created virtual environment.
+
+1. Copy the example configuration and set distinct secrets:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   `ML_SERVICE_API_KEY` must be the same value in both services.
+   `ANALYSIS_PLAN_TOKEN_SECRET` must be a different value of at least 32
+   characters.
+
+2. Start the ML service in one terminal:
 
    ```bash
    cd ml-service
@@ -42,63 +78,111 @@ The datasets are synthetic and committed as runtime resources.
    ML_SERVICE_API_KEY=your-secret uv run uvicorn app.main:app --port 8080
    ```
 
-3. Install Node dependencies and run the MCP server:
+3. Start the MCP server from the repository root in another terminal:
 
    ```bash
    npm install
    npm run dev
    ```
 
-Run the TypeScript unit tests with `npm run test:unit`, build widgets with
-`npm --prefix src/widgets run build`, and run Python tests with
-`cd ml-service && uv run --extra dev pytest`.
+## MCP workflow
 
-### Limits and reliability
+Use the tools in this order:
 
-The MCP server and ML service enforce these configurable limits before training:
+1. Read `seer://datasets` and call `profile_dataset`.
+2. Call `create_analysis_plan` with only columns returned by the profile.
+3. Show the plan and obtain explicit user approval.
+4. Call `confirm_analysis_plan`, then `run_analysis` with the returned token.
+5. Present the returned metrics, warnings, limitations, and chart data as
+   estimates—not guarantees.
 
-| Environment variable | Default |
-| --- | ---: |
-| `ML_PROFILE_MAX_CSV_BYTES` | 5 MiB |
-| `ML_PROFILE_MAX_CSV_ROWS` | 20,000 |
-| `ML_PROFILE_MAX_CSV_COLUMNS` | 50 |
-| `ML_PROFILE_MAX_CATEGORICAL_VALUES` | 50 |
-| `ML_PROFILE_SAMPLE_ROWS` | 10 |
-| `ML_MAX_ENCODED_FEATURES` | 500 |
-| `ML_MAX_PREDICTION_ROWS` | 10 |
-| `ML_MIN_USABLE_ROWS` | 20 |
-| `ML_MAX_CLASSIFICATION_CLASSES` | 10 |
-| `ML_CLASS_IMBALANCE_THRESHOLD_PERCENT` | 20% |
+The `seer_guided_analysis` prompt supplies this sequence to MCP hosts. The
+server rejects altered, expired, or dataset-mismatched approval tokens.
 
-`ML_SERVICE_TIMEOUT_MS` defaults to 120,000 milliseconds for each ML-service
-attempt. `ML_SERVICE_MAX_RETRIES` defaults to one retry after 250 ms for a
-connection failure or 5xx response; timeouts, cancellations, authentication,
-validation, and malformed responses are never retried. Every MCP request ID is
-forwarded as `X-Request-ID`, echoed by the ML service, and used in safe
-operational logs. The service never logs CSV contents or prediction inputs.
+## Configuration
 
-Prediction rows outside the observed numeric dataset range are disclosed in
-the approval plan and checked again against the training range in the final
-result. Classification results warn when the least frequent usable class is
-below the configured 20% threshold. `run_analysis` supports optional MCP
-Tasks: ordinary calls return synchronously, while task-capable clients receive
-progress updates and can cancel before the ML-service call completes.
+Copy `.env.example`; never commit `.env` or real secret values. Set secrets in
+NitroCloud and Cloud Run's secret manager rather than build arguments or source
+files.
 
-### Deployment contract
+| Variable | Default | Used by | Purpose |
+| --- | --- | --- | --- |
+| `ML_SERVICE_BASE_URL` | `http://127.0.0.1:8080` | MCP server | ML service URL; HTTPS is required outside local development. |
+| `ML_SERVICE_API_KEY` | required | Both | Shared bearer secret for every ML-service request. |
+| `ANALYSIS_PLAN_TOKEN_SECRET` | required | MCP server | Separate 32+ character HMAC secret for approval tokens. |
+| `ML_SERVICE_TIMEOUT_MS` | `120000` | MCP server | Timeout per ML-service attempt, in milliseconds. |
+| `ML_SERVICE_MAX_RETRIES` | `1` | MCP server | Retries a connection failure or 5xx response once after 250 ms. |
+| `ML_PROFILE_MAX_CSV_BYTES` | `5242880` | ML service | Maximum CSV size (5 MiB). |
+| `ML_PROFILE_MAX_CSV_ROWS` | `20000` | ML service | Maximum dataset rows. |
+| `ML_PROFILE_MAX_CSV_COLUMNS` | `50` | ML service | Maximum dataset columns. |
+| `ML_PROFILE_MAX_CATEGORICAL_VALUES` | `50` | Both | Maximum categorical values per feature. |
+| `ML_PROFILE_SAMPLE_ROWS` | `10` | ML service | Number of profile sample rows returned. |
+| `ML_MAX_ENCODED_FEATURES` | `500` | Both | Maximum one-hot-encoded feature count. |
+| `ML_MAX_PREDICTION_ROWS` | `10` | Both | Maximum prediction rows per plan. |
+| `ML_MIN_USABLE_ROWS` | `20` | Both | Minimum non-missing-target rows needed to analyse. |
+| `ML_MAX_CLASSIFICATION_CLASSES` | `10` | Both | Maximum target classes for classification. |
+| `ML_CLASS_IMBALANCE_THRESHOLD_PERCENT` | `20` | ML service | Warn when a usable target class falls below this percentage. |
+| `NITRO_LOG_LEVEL` | `info` | MCP server | NitroStack log verbosity. |
+| `NITROSTACK_APP_MODE` | `universal` | MCP server | NitroStack application mode. |
+| `MCP_TRANSPORT_TYPE` | framework default | MCP server | Optional `stdio`, `http`, or `dual` transport selection. |
+| `PORT`, `HOST`, `ENABLE_CORS` | framework default | MCP server | Optional HTTP transport settings. |
 
-Deploy `ml-service/` independently to Cloud Run in `asia-south1` and configure
-the same `ML_SERVICE_API_KEY` as a Cloud Run secret and NitroCloud environment
-variable. The Cloud Run endpoint may allow unauthenticated invocation because
-the application requires the bearer secret for every request. Configure the
-deployed NitroCloud server with the Cloud Run HTTPS URL, then invoke
-`python_health`; a successful response is:
+Retries never apply to timeouts, cancellations, authentication or validation
+failures, or malformed ML-service responses. `X-Request-ID` is forwarded to the
+ML service and echoed in the response for safe request correlation; CSV content
+and prediction inputs are not logged.
+
+## Reliability and responsible use
+
+Seer enforces size, schema, category, encoded-feature, and prediction-row
+limits before model fitting. It surfaces missing data, duplicate rows,
+unsupported columns, class imbalance, weak baseline comparisons, unseen
+categories, and extrapolation beyond observed or training ranges.
+
+Results are estimates based on historical synthetic data. They can be wrong,
+and relevant explanatory variables or biases may be absent. Do not use Seer as
+the sole basis for employment, compensation, or other high-impact decisions.
+
+## Deployment
+
+Deploy `ml-service/` separately to Cloud Run (the intended region is
+`asia-south1`) using its Dockerfile, and deploy the repository-root NitroStack
+application to NitroCloud. Configure the same `ML_SERVICE_API_KEY` as a Cloud
+Run secret and NitroCloud environment variable, then set
+`ML_SERVICE_BASE_URL` in NitroCloud to the Cloud Run HTTPS URL. Keep
+`ANALYSIS_PLAN_TOKEN_SECRET` in NitroCloud only.
+
+The Python service's `/health` endpoint returns:
 
 ```json
 {"status":"healthy","service":"seer-ml","version":"0.1.0"}
 ```
 
-After each NitroCloud deployment, read `seer://datasets`, then profile and run
-one approved regression plan and one approved classification plan. This
-confirms that both CSV files were copied into the deployed server artifact,
-NitroCloud can reach the Cloud Run ML endpoint, and the full approved-analysis
-workflow succeeds.
+Cloud Run can permit unauthenticated invocation only when the shared bearer
+secret remains configured and protected. Prefer a restricted service endpoint
+and managed secrets in any environment beyond this MVP.
+
+## Verification
+
+Run the following checks from the repository root:
+
+```bash
+npm run test:unit
+cd ml-service && uv run --extra dev pytest -q
+```
+
+`npm run test:unit` performs the NitroStack production build and bundles all
+four widgets before running the TypeScript unit tests.
+
+For a local end-to-end check, start both services, then execute
+`python_health`, profile each bundled dataset, create and confirm an approved
+regression plan, and repeat with a classification plan.
+
+## Project layout
+
+```text
+src/                 TypeScript NitroStack MCP server, resources, tools, widgets
+ml-service/          Python 3.12 FastAPI and scikit-learn service
+docs/                Architecture and operational documentation
+.env.example         Safe configuration template
+```

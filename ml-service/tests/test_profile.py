@@ -42,6 +42,14 @@ EMP003,8,engineering,110000,mentors teammates
     assert {column["name"] for column in body["unsupportedColumns"]} == {"notes"}
 
 
+def test_profile_endpoint_returns_dimensions_with_request_context() -> None:
+    with make_client() as client:
+        response = profile(client, "annual_salary\n80000\n90000\n")
+
+    assert response.status_code == 200
+    assert response.json()["dimensions"] == {"rows": 2, "columns": 1}
+
+
 def test_profile_rejects_missing_or_invalid_api_keys() -> None:
     with make_client() as client:
         response = client.post("/v1/profile")

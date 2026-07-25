@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 import io
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import Annotated, Any, Literal, TypeAlias
+from typing import Annotated, Any, Literal, cast
 from uuid import uuid4
 
 import numpy as np
 import pandas as pd
+from numpy.typing import NDArray
 from pandas.errors import EmptyDataError, ParserError
 from pydantic import BaseModel, ConfigDict, Field
 from sklearn.compose import ColumnTransformer
@@ -27,7 +29,6 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 
 from .config import Settings
 from .profiling import ProfileFailure, _validate_header
-
 
 Scalar = str | int | float | bool
 
@@ -74,7 +75,7 @@ class ClassificationAnalysisPlan(BaseAnalysisPlan):
     taskType: Literal["classification"]
 
 
-AnalysisPlan: TypeAlias = Annotated[
+type AnalysisPlan = Annotated[
     RegressionAnalysisPlan | ClassificationAnalysisPlan,
     Field(discriminator="taskType"),
 ]
@@ -211,7 +212,16 @@ class ClassificationAnalysisResponse(BaseModel):
     explanationFacts: dict[str, str | int | float | bool]
 
 
-AnalysisResponse: TypeAlias = RegressionAnalysisResponse | ClassificationAnalysisResponse
+type AnalysisResponse = RegressionAnalysisResponse | ClassificationAnalysisResponse
+type TrainTestSplit = tuple[pd.DataFrame, pd.DataFrame, pd.Series, pd.Series]
+type FloatPredictions = NDArray[np.float64]
+type LabelPredictions = NDArray[np.object_]
+type PerClassMetricArrays = tuple[
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.float64],
+    NDArray[np.int64],
+]
 
 
 @dataclass(frozen=True)
@@ -230,7 +240,11 @@ def analyze_regression_csv(raw_csv: bytes, plan: RegressionAnalysisPlan, setting
     dataframe = _read_and_validate_csv(raw_csv, settings)
     _validate_plan_against_dataframe(plan, dataframe, settings, numeric_target=True)
 
-    target = pd.to_numeric(dataframe[plan.targetColumn], errors="raise").astype(float)
+    target = pd.Series(
+        pd.to_numeric(_series_column(dataframe, plan.targetColumn), errors="raise"),
+        index=dataframe.index,
+        dtype="float64",
+    )
     usable, usable_target = _usable_rows(dataframe, target)
     if len(usable) < settings.min_usable_rows:
         raise AnalysisFailure(422, f"At least {settings.min_usable_rows} rows with a target value are required for regression.")
@@ -238,23 +252,21 @@ def analyze_regression_csv(raw_csv: bytes, plan: RegressionAnalysisPlan, setting
         raise AnalysisFailure(422, "Regression requires a target with at least five distinct values.")
 
     features = _feature_frame(usable, plan)
-    x_train, x_test, y_train, y_test = train_test_split(
-        features, usable_target, test_size=0.2, random_state=42,
-    )
+    x_train, x_test, y_train, y_test = _train_test_split(features, usable_target)
     model = Pipeline([("preprocessor", _preprocessor(plan.preprocessing)), ("regressor", LinearRegression())])
     baseline = DummyRegressor(strategy="mean")
     model.fit(x_train, y_train)
     baseline.fit(x_train, y_train)
 
-    model_predictions = model.predict(x_test)
-    baseline_predictions = baseline.predict(x_test)
+    model_predictions = _float_predictions(model.predict(x_test))
+    baseline_predictions = _float_predictions(baseline.predict(x_test))
     model_metrics = _regression_metrics(y_test, model_predictions)
     baseline_metrics = _regression_metrics(y_test, baseline_predictions)
     improvement = _regression_improvement(model_metrics, baseline_metrics)
     quality = _quality(improvement.maePercent)
 
     prediction_frame = _prediction_frame(plan)
-    estimates = model.predict(prediction_frame)
+    estimates = _float_predictions(model.predict(prediction_frame))
     coverage = _dataset_coverage(x_train, x_test, plan.preprocessing)
     predictions = [
         RegressionPrediction(input=row, estimatedValue=float(estimate), coverage=_prediction_coverage(row, coverage))
@@ -276,14 +288,14 @@ def analyze_regression_csv(raw_csv: bytes, plan: RegressionAnalysisPlan, setting
             residualVsPredicted=[ResidualVsPredictedPoint(predicted=float(predicted), residual=float(actual - predicted)) for actual, predicted in zip(y_test, model_predictions, strict=True)],
         ),
         datasetCoverage=coverage, warnings=warnings,
-        explanationFacts={"targetColumn": plan.targetColumn, "usableRows": int(len(usable)), "droppedMissingTargetRows": int(len(dataframe) - len(usable))},
+        explanationFacts={"targetColumn": plan.targetColumn, "usableRows": len(usable), "droppedMissingTargetRows": int(len(dataframe) - len(usable))},
     )
 
 
 def analyze_classification_csv(raw_csv: bytes, plan: ClassificationAnalysisPlan, settings: Settings) -> ClassificationAnalysisResponse:
     dataframe = _read_and_validate_csv(raw_csv, settings)
     _validate_plan_against_dataframe(plan, dataframe, settings, numeric_target=False)
-    target = dataframe[plan.targetColumn].astype("string")
+    target = _series_column(dataframe, plan.targetColumn).astype("string")
     usable, usable_target = _usable_rows(dataframe, target)
     labels = sorted(str(label) for label in usable_target.unique())
     class_counts = usable_target.value_counts()
@@ -296,9 +308,7 @@ def analyze_classification_csv(raw_csv: bytes, plan: ClassificationAnalysisPlan,
 
     features = _feature_frame(usable, plan)
     try:
-        x_train, x_test, y_train, y_test = train_test_split(
-            features, usable_target, test_size=0.2, random_state=42, stratify=usable_target,
-        )
+        x_train, x_test, y_train, y_test = _train_test_split(features, usable_target, stratify=usable_target)
     except ValueError as error:
         raise AnalysisFailure(422, "This dataset cannot create the required stratified classification split.") from error
 
@@ -313,8 +323,8 @@ def analyze_classification_csv(raw_csv: bytes, plan: ClassificationAnalysisPlan,
         raise AnalysisFailure(422, "The classification model could not be fitted to this approved plan.") from error
     baseline.fit(x_train, y_train)
 
-    model_predictions = model.predict(x_test)
-    baseline_predictions = baseline.predict(x_test)
+    model_predictions = _label_predictions(model.predict(x_test))
+    baseline_predictions = _label_predictions(baseline.predict(x_test))
     model_metrics = _classification_metrics(y_test, model_predictions)
     baseline_metrics = _classification_metrics(y_test, baseline_predictions)
     improvement = ClassificationImprovement(
@@ -324,7 +334,7 @@ def analyze_classification_csv(raw_csv: bytes, plan: ClassificationAnalysisPlan,
     quality = _quality(improvement.f1Absolute * 100)
     coverage = _dataset_coverage(x_train, x_test, plan.preprocessing)
     prediction_frame = _prediction_frame(plan)
-    predicted_labels = model.predict(prediction_frame)
+    predicted_labels = _label_predictions(model.predict(prediction_frame))
     probabilities = model.predict_proba(prediction_frame)
     model_labels = [str(label) for label in model.named_steps["classifier"].classes_]
     predictions = [
@@ -361,7 +371,7 @@ def analyze_classification_csv(raw_csv: bytes, plan: ClassificationAnalysisPlan,
             classDistribution=distribution,
         ),
         perClassMetrics=per_class, datasetCoverage=coverage, warnings=warnings,
-        explanationFacts={"targetColumn": plan.targetColumn, "usableRows": int(len(usable)), "droppedMissingTargetRows": int(len(dataframe) - len(usable)), "classCount": len(labels)},
+        explanationFacts={"targetColumn": plan.targetColumn, "usableRows": len(usable), "droppedMissingTargetRows": int(len(dataframe) - len(usable)), "classCount": len(labels)},
     )
 
 
@@ -417,6 +427,25 @@ def _validate_plan_against_dataframe(plan: BaseAnalysisPlan, dataframe: pd.DataF
         raise AnalysisFailure(422, "The CSV no longer matches the approved numeric analysis plan.") from error
 
 
+def _series_column(dataframe: pd.DataFrame, name: str) -> pd.Series:
+    column = dataframe[name]
+    if not isinstance(column, pd.Series):
+        raise AnalysisFailure(422, f"CSV column '{name}' must have a single header.")
+    return column
+
+
+def _train_test_split(
+    features: pd.DataFrame,
+    target: pd.Series,
+    *,
+    stratify: pd.Series | None = None,
+) -> TrainTestSplit:
+    return cast(
+        TrainTestSplit,
+        train_test_split(features, target, test_size=0.2, random_state=42, stratify=stratify),
+    )
+
+
 def _usable_rows(dataframe: pd.DataFrame, target: pd.Series) -> tuple[pd.DataFrame, pd.Series]:
     present = target.notna()
     return dataframe.loc[present].copy(), target.loc[present]
@@ -430,7 +459,7 @@ def _feature_frame(dataframe: pd.DataFrame, plan: BaseAnalysisPlan) -> pd.DataFr
 
 
 def _prediction_frame(plan: BaseAnalysisPlan) -> pd.DataFrame:
-    frame = pd.DataFrame(plan.predictionRows, columns=plan.featureColumns)
+    frame = pd.DataFrame.from_records(plan.predictionRows, columns=pd.Index(plan.featureColumns))
     for name in plan.preprocessing.numeric:
         frame[name] = pd.to_numeric(frame[name], errors="raise")
     return frame
@@ -446,7 +475,15 @@ def _preprocessor(preprocessing: PreprocessingPlan) -> ColumnTransformer:
     )
 
 
-def _regression_metrics(actual: pd.Series, predicted: np.ndarray) -> RegressionMetricValues:
+def _float_predictions(values: object) -> FloatPredictions:
+    return cast(FloatPredictions, np.asarray(values, dtype=np.float64).reshape(-1))
+
+
+def _label_predictions(values: object) -> LabelPredictions:
+    return cast(LabelPredictions, np.asarray(values, dtype=object).reshape(-1))
+
+
+def _regression_metrics(actual: pd.Series, predicted: FloatPredictions) -> RegressionMetricValues:
     return RegressionMetricValues(
         mae=float(mean_absolute_error(actual, predicted)),
         rmse=float(mean_squared_error(actual, predicted) ** 0.5),
@@ -462,15 +499,18 @@ def _regression_improvement(model: RegressionMetricValues, baseline: RegressionM
     )
 
 
-def _classification_metrics(actual: pd.Series, predicted: np.ndarray) -> ClassificationMetricValues:
-    precision, recall, f1, _ = precision_recall_fscore_support(actual, predicted, average="weighted", zero_division=0)
+def _classification_metrics(actual: pd.Series, predicted: LabelPredictions) -> ClassificationMetricValues:
+    precision, recall, f1, _ = precision_recall_fscore_support(actual, predicted, average="weighted", zero_division=cast(Any, 0))
     return ClassificationMetricValues(
         accuracy=float(accuracy_score(actual, predicted)), precision=float(precision), recall=float(recall), f1=float(f1),
     )
 
 
-def _per_class_metrics(actual: pd.Series, predicted: np.ndarray, labels: list[str]) -> list[PerClassMetrics]:
-    precision, recall, f1, support = precision_recall_fscore_support(actual, predicted, labels=labels, zero_division=0)
+def _per_class_metrics(actual: pd.Series, predicted: LabelPredictions, labels: list[str]) -> list[PerClassMetrics]:
+    precision, recall, f1, support = cast(
+        PerClassMetricArrays,
+        precision_recall_fscore_support(actual, predicted, labels=labels, zero_division=cast(Any, 0)),
+    )
     return [
         PerClassMetrics(classLabel=label, precision=float(item_precision), recall=float(item_recall), f1=float(item_f1), support=int(item_support))
         for label, item_precision, item_recall, item_f1, item_support in zip(labels, precision, recall, f1, support, strict=True)
@@ -496,7 +536,7 @@ def _quality(improvement_percent: float) -> Literal["useful_signal", "weak_signa
 def _dataset_coverage(training: pd.DataFrame, testing: pd.DataFrame, preprocessing: PreprocessingPlan) -> DatasetCoverage:
     numeric_ranges = {name: {"min": float(training[name].min()), "max": float(training[name].max())} for name in preprocessing.numeric}
     categorical_values = {name: sorted(str(value) for value in training[name].dropna().astype(str).unique()) for name in preprocessing.categorical}
-    return DatasetCoverage(trainingRows=int(len(training)), testRows=int(len(testing)), numericRanges=numeric_ranges, categoricalValues=categorical_values)
+    return DatasetCoverage(trainingRows=len(training), testRows=len(testing), numericRanges=numeric_ranges, categoricalValues=categorical_values)
 
 
 def _prediction_coverage(row: dict[str, Scalar], coverage: DatasetCoverage) -> PredictionCoverage:
@@ -505,7 +545,7 @@ def _prediction_coverage(row: dict[str, Scalar], coverage: DatasetCoverage) -> P
     return PredictionCoverage(outsideNumericRanges=outside, unseenCategoricalValues=unseen)
 
 
-def _prediction_warnings(predictions: list[RegressionPrediction | ClassificationPrediction]) -> list[str]:
+def _prediction_warnings(predictions: Sequence[RegressionPrediction | ClassificationPrediction]) -> list[str]:
     warnings: list[str] = []
     for index, prediction in enumerate(predictions, start=1):
         if prediction.coverage.outsideNumericRanges:

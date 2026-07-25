@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 
 from .config import Settings
 
-
 ColumnType = Literal["boolean", "numeric", "categorical", "datetime", "text", "empty"]
 
 
@@ -121,6 +120,7 @@ def profile_csv(dataset_id: str, raw_csv: bytes, settings: Settings) -> ProfileR
         missing_count = int(series.isna().sum())
         unique_count = int(non_null.nunique())
         column_type = _infer_column_type(series, settings.max_categorical_values)
+        is_identifier = _is_identifier(str(name), column_type, len(non_null), unique_count, len(dataframe.index))
         numeric_summary = _numeric_summary(series) if column_type == "numeric" else None
         categories = _category_frequencies(series) if column_type in {"boolean", "categorical"} else []
 
@@ -138,7 +138,7 @@ def profile_csv(dataset_id: str, raw_csv: bytes, settings: Settings) -> ProfileR
             unsupported_columns.append(UnsupportedColumn(name=str(name), reason="Column contains no non-missing values."))
         elif unique_count <= 1:
             constant_columns.append(str(name))
-        elif _is_identifier(str(name), column_type, len(non_null), unique_count, len(dataframe.index)):
+        elif is_identifier:
             identifier_candidates.append(str(name))
         elif column_type == "numeric" or (
             column_type in {"boolean", "categorical"} and 2 <= unique_count <= 10
@@ -147,7 +147,7 @@ def profile_csv(dataset_id: str, raw_csv: bytes, settings: Settings) -> ProfileR
 
         if column_type == "datetime":
             unsupported_columns.append(UnsupportedColumn(name=str(name), reason="Datetime columns are not supported in the MVP."))
-        elif column_type == "text":
+        elif column_type == "text" and not is_identifier:
             unsupported_columns.append(UnsupportedColumn(
                 name=str(name),
                 reason=f"Column has more than {settings.max_categorical_values} distinct values and is treated as free text.",
@@ -170,7 +170,7 @@ def profile_csv(dataset_id: str, raw_csv: bytes, settings: Settings) -> ProfileR
 
     return ProfileResponse(
         datasetId=dataset_id,
-        dimensions={"rows": int(len(dataframe.index)), "columns": int(len(dataframe.columns))},
+        dimensions={"rows": len(dataframe.index), "columns": len(dataframe.columns)},
         columns=columns,
         duplicateRowCount=duplicate_count,
         targetCandidates=target_candidates,

@@ -1,9 +1,9 @@
-from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
-from hmac import compare_digest
 import logging
 import re
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
+from hmac import compare_digest
 from uuid import uuid4
 
 from fastapi import (
@@ -21,14 +21,13 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, TypeAdapter
 
 from .analysis import (
-    AnalysisPlan,
     AnalysisFailure,
+    AnalysisPlan,
     AnalysisResponse,
     analyze_csv,
 )
 from .config import Settings
 from .profiling import ProfileFailure, ProfileResponse, profile_csv
-
 
 logger = logging.getLogger("seer_ml")
 REQUEST_ID_HEADER = "X-Request-ID"
@@ -132,8 +131,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         raw_csv = await file.read(settings.max_csv_bytes + 1)
         try:
             response = profile_csv(dataset_id, raw_csv, settings)
-            request.state.rows = response.dimensions.rows
-            request.state.columns = response.dimensions.columns
+            request.state.rows = response.dimensions["rows"]
+            request.state.columns = response.dimensions["columns"]
             return response
         except ProfileFailure as error:
             raise HTTPException(
