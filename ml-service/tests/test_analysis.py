@@ -74,6 +74,9 @@ def test_mixed_feature_regression_returns_metrics_predictions_and_diagnostics() 
     assert len(result.charts.residualVsPredicted) == 8
     assert result.metrics.model.mae < result.metrics.baseline.mae
     assert result.predictions[0].estimatedValue > 0
+    assert any("small dataset" in warning for warning in result.warnings)
+    assert any("associations, not causes" in warning for warning in result.warnings)
+    assert any("bias or unequal outcomes" in warning for warning in result.warnings)
 
 
 def test_unseen_categories_and_extrapolation_are_disclosed() -> None:
@@ -151,6 +154,9 @@ def test_mixed_feature_classification_returns_probabilities_and_evaluation() -> 
     assert 0 <= result.predictions[0].predictedProbability <= 1
     assert result.charts.confusionMatrix.labels == ["leave", "stay"]
     assert len(result.perClassMetrics) == 2
+    assert any("small dataset" in warning for warning in result.warnings)
+    assert any("associations, not causes" in warning for warning in result.warnings)
+    assert any("bias or unequal outcomes" in warning for warning in result.warnings)
 
 
 def test_classification_rejects_a_class_without_enough_rows() -> None:

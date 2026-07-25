@@ -16,7 +16,7 @@ CSV or establish causal relationships.
 1. Exposes approved datasets through MCP resources.
 2. Profiles the full CSV for schema, quality, and modelling eligibility.
 3. Validates a regression or classification plan against the dataset.
-4. Issues a signed, 15-minute approval token.
+4. Issues a signed review token, then exchanges it for an execution-only token after approval.
 5. Trains and evaluates the approved plan atomically in the ML service.
 6. Returns evidence, charts, warnings, and prediction coverage to MCP widgets.
 
@@ -92,12 +92,16 @@ Use the tools in this order:
 1. Read `seer://datasets` and call `profile_dataset`.
 2. Call `create_analysis_plan` with only columns returned by the profile.
 3. Show the plan and obtain explicit user approval.
-4. Call `confirm_analysis_plan`, then `run_analysis` with the returned token.
+4. Call `confirm_analysis_plan` with the review token, then `run_analysis` with the returned execution token.
 5. Present the returned metrics, warnings, limitations, and chart data as
    estimates—not guarantees.
 
-The `seer_guided_analysis` prompt supplies this sequence to MCP hosts. The
-server rejects altered, expired, or dataset-mismatched approval tokens.
+The `seer_guided_analysis` prompt supplies this sequence to MCP hosts.
+`run_analysis` rejects review tokens as well as altered, expired, or
+dataset-mismatched execution tokens. The current NitroStack runtime does not
+expose MCP elicitation, so compatible hosts must obtain the user’s explicit
+approval before calling `confirm_analysis_plan`; the approval widget follows
+that sequence.
 
 ## Configuration
 
@@ -120,6 +124,7 @@ files.
 | `ML_MAX_ENCODED_FEATURES` | `500` | Both | Maximum one-hot-encoded feature count. |
 | `ML_MAX_PREDICTION_ROWS` | `10` | Both | Maximum prediction rows per plan. |
 | `ML_MIN_USABLE_ROWS` | `20` | Both | Minimum non-missing-target rows needed to analyse. |
+| `ML_SMALL_DATASET_WARNING_ROWS` | `100` | Both | Warn when usable target rows are below this value. |
 | `ML_MAX_CLASSIFICATION_CLASSES` | `10` | Both | Maximum target classes for classification. |
 | `ML_CLASS_IMBALANCE_THRESHOLD_PERCENT` | `20` | ML service | Warn when a usable target class falls below this percentage. |
 | `NITRO_LOG_LEVEL` | `info` | MCP server | NitroStack log verbosity. |
@@ -136,8 +141,10 @@ and prediction inputs are not logged.
 
 Seer enforces size, schema, category, encoded-feature, and prediction-row
 limits before model fitting. It surfaces missing data, duplicate rows,
-unsupported columns, class imbalance, weak baseline comparisons, unseen
-categories, and extrapolation beyond observed or training ranges.
+unsupported columns, small datasets, class imbalance, weak baseline
+comparisons, unseen categories, and extrapolation beyond observed or training
+ranges. Every final result also warns that selected features can omit important
+factors and that historical data can reflect bias or unequal outcomes.
 
 Results are estimates based on historical synthetic data. They can be wrong,
 and relevant explanatory variables or biases may be absent. Do not use Seer as

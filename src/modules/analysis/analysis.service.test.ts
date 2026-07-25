@@ -31,9 +31,13 @@ test('creates a deterministic, signed regression analysis plan', async () => {
   assert.equal(result.plan.rows.usable, 24);
   assert.deepEqual(result.plan.preprocessing.numeric, ['years_experience', 'performance_rating']);
   assert.deepEqual(result.plan.preprocessing.categorical, ['department']);
-  assert.match(result.planToken, /\./);
+  assert.match(result.reviewToken, /\./);
   assert.ok(result.plan.assumptions.some((item) => item.includes('performance_rating')));
-  assert.deepEqual((await service.confirm(result.planToken)).approved, true);
+  const confirmed = await service.confirm(result.reviewToken);
+  assert.deepEqual(confirmed.approved, true);
+  assert.match(confirmed.executionToken, /\./);
+  await assert.rejects(service.prepareRun(result.reviewToken), /Explicit user approval is required/);
+  assert.equal((await service.prepareRun(confirmed.executionToken)).plan.question, 'Estimate annual salary for an employee.');
 });
 
 test('creates a valid classification plan for a two-class target', async () => {
@@ -81,7 +85,7 @@ test('rejects confirmation when the packaged dataset changes', async () => {
   });
   replaceCsv(Buffer.from(`${regressionCsv.toString('utf8')}EMP9999,25,sales,4,150000\n`));
 
-  await assert.rejects(service.confirm(result.planToken), /dataset has changed/);
+  await assert.rejects(service.confirm(result.reviewToken), /dataset has changed/);
 });
 
 test('discloses prediction rows outside the observed numeric dataset range before approval', async () => {
@@ -100,6 +104,7 @@ test('enforces a configured prediction-row limit before issuing a plan token', a
     maxEncodedFeatures: 500,
     maxPredictionRows: 1,
     minUsableRows: 20,
+    smallDatasetWarningRows: 100,
     maxClassificationClasses: 10,
   });
 
@@ -108,4 +113,16 @@ test('enforces a configured prediction-row limit before issuing a plan token', a
     featureColumns: ['years_experience'], taskType: 'regression',
     predictionRows: [{ years_experience: 10 }, { years_experience: 11 }],
   }), /maximum of 1 prediction row/);
+});
+
+test('discloses small datasets and universal model limitations before approval', async () => {
+  const { service } = createService();
+  const result = await service.create({
+    datasetId: 'employee-compensation', question: 'Estimate salary', targetColumn: 'annual_salary',
+    featureColumns: ['years_experience'], taskType: 'regression', predictionRows: [{ years_experience: 10 }],
+  });
+
+  assert.ok(result.plan.warnings.some((warning) => warning.includes('small dataset')));
+  assert.ok(result.plan.warnings.some((warning) => warning.includes('associations, not causes')));
+  assert.ok(result.plan.warnings.some((warning) => warning.includes('bias or unequal outcomes')));
 });

@@ -12,8 +12,8 @@ const plan = {
 test('creates, confirms, and executes plans through thin MCP tool interfaces', async () => {
   const calls: string[] = [];
   const analysis = {
-    create: async () => ({ plan, planToken: 'token', expiresAt: '2026-01-01T00:15:00.000Z' }),
-    confirm: async () => ({ approved: true as const, plan, expiresAt: '2026-01-01T00:15:00.000Z' }),
+    create: async () => ({ plan, reviewToken: 'review-token', expiresAt: '2026-01-01T00:15:00.000Z' }),
+    confirm: async () => ({ approved: true as const, plan, executionToken: 'execution-token', expiresAt: '2026-01-01T00:15:00.000Z' }),
     prepareRun: async () => ({ plan, csv: Buffer.from('years_experience,annual_salary\n10,100000\n'), expiresAt: '2026-01-01T00:15:00.000Z' }),
   };
   const mlClient = {
@@ -36,8 +36,8 @@ test('creates, confirms, and executes plans through thin MCP tool interfaces', a
     datasetId: 'employee-compensation', question: 'Estimate salary', targetColumn: 'annual_salary',
     featureColumns: ['years_experience'], taskType: 'regression', predictionRows: [{ years_experience: 10 }],
   }, context);
-  const confirmed = await tools.confirmAnalysisPlan({ planToken: created.planToken }, context);
-  const result = await tools.runAnalysis({ planToken: created.planToken }, context);
+  const confirmed = await tools.confirmAnalysisPlan({ reviewToken: created.reviewToken }, context);
+  const result = await tools.runAnalysis({ executionToken: confirmed.executionToken }, context);
 
   assert.equal(confirmed.approved, true);
   assert.equal(result.targetColumn, 'annual_salary');
@@ -66,7 +66,7 @@ test('executes an approved classification plan through the same tool', async () 
   const tools = new AnalysisTools(analysis as never, mlClient as never);
   const context = { requestId: 'test-request', logger: { info: () => undefined, error: () => undefined } } as unknown as ExecutionContext;
 
-  const result = await tools.runAnalysis({ planToken: 'token' }, context);
+  const result = await tools.runAnalysis({ executionToken: 'execution-token' }, context);
 
   assert.equal(result.taskType, 'classification');
   assert.equal(result.predictions[0]?.predictedClass, 'leave');

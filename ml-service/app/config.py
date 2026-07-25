@@ -12,6 +12,7 @@ class Settings:
     max_encoded_features: int = 500
     max_prediction_rows: int = 10
     min_usable_rows: int = 20
+    small_dataset_warning_rows: int = 100
     max_classification_classes: int = 10
     class_imbalance_threshold_percent: float = 20.0
     sample_rows: int = 10
@@ -30,6 +31,7 @@ class Settings:
             max_encoded_features=_positive_int("ML_MAX_ENCODED_FEATURES", 500),
             max_prediction_rows=_bounded_int("ML_MAX_PREDICTION_ROWS", 10, minimum=1, maximum=10),
             min_usable_rows=_positive_int("ML_MIN_USABLE_ROWS", 20),
+            small_dataset_warning_rows=_positive_int("ML_SMALL_DATASET_WARNING_ROWS", 100),
             max_classification_classes=_bounded_int("ML_MAX_CLASSIFICATION_CLASSES", 10, minimum=2, maximum=10),
             class_imbalance_threshold_percent=_percentage("ML_CLASS_IMBALANCE_THRESHOLD_PERCENT", 20.0),
             sample_rows=_positive_int("ML_PROFILE_SAMPLE_ROWS", 10),

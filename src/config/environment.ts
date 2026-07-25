@@ -19,6 +19,7 @@ const analysisLimitsEnvironmentSchema = z.object({
   ML_MAX_ENCODED_FEATURES: z.coerce.number().int().positive().default(500),
   ML_MAX_PREDICTION_ROWS: z.coerce.number().int().positive().max(10).default(10),
   ML_MIN_USABLE_ROWS: z.coerce.number().int().min(20).default(20),
+  ML_SMALL_DATASET_WARNING_ROWS: z.coerce.number().int().min(20).default(100),
   ML_MAX_CLASSIFICATION_CLASSES: z.coerce.number().int().min(2).max(10).default(10),
 });
 
@@ -27,6 +28,7 @@ export interface AnalysisLimits {
   maxEncodedFeatures: number;
   maxPredictionRows: number;
   minUsableRows: number;
+  smallDatasetWarningRows: number;
   maxClassificationClasses: number;
 }
 
@@ -63,6 +65,7 @@ export function loadAnalysisLimits(environment: NodeJS.ProcessEnv = process.env)
     maxEncodedFeatures: parsed.ML_MAX_ENCODED_FEATURES,
     maxPredictionRows: parsed.ML_MAX_PREDICTION_ROWS,
     minUsableRows: parsed.ML_MIN_USABLE_ROWS,
+    smallDatasetWarningRows: parsed.ML_SMALL_DATASET_WARNING_ROWS,
     maxClassificationClasses: parsed.ML_MAX_CLASSIFICATION_CLASSES,
   };
 }

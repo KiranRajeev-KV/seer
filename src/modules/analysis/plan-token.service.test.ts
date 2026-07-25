@@ -21,18 +21,22 @@ const plan: AnalysisPlan = {
   split: { trainingPercent: 80, testPercent: 20, randomState: 42 },
 };
 
-test('issues and verifies a signed analysis-plan token', () => {
+test('issues review tokens and exchanges them for execution tokens', () => {
   const tokenService = PlanTokenService.forTesting({ tokenSecret: 'a-very-long-dedicated-plan-token-secret', tokenLifetimeMs: 900_000 }, () => 1_000);
-  const issued = tokenService.issue(plan, 'a'.repeat(64));
+  const issued = tokenService.issueReview(plan, 'a'.repeat(64));
+  const review = tokenService.verify(issued.token);
+  const execution = tokenService.issueExecution(review);
 
-  assert.equal(tokenService.verify(issued.token).plan.question, 'Estimate salary');
+  assert.equal(review.purpose, 'review');
+  assert.equal(tokenService.verify(execution.token).purpose, 'execution');
+  assert.equal(review.plan.question, 'Estimate salary');
   assert.equal(issued.expiresAt, '1970-01-01T00:15:01.000Z');
 });
 
 test('rejects tampered and expired analysis-plan tokens', () => {
   let now = 1_000;
   const tokenService = PlanTokenService.forTesting({ tokenSecret: 'a-very-long-dedicated-plan-token-secret', tokenLifetimeMs: 100 }, () => now);
-  const issued = tokenService.issue(plan, 'a'.repeat(64));
+  const issued = tokenService.issueReview(plan, 'a'.repeat(64));
   const tampered = `${issued.token.slice(0, -1)}x`;
 
   assert.throws(() => tokenService.verify(tampered), PlanTokenError);

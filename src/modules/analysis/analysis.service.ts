@@ -49,26 +49,43 @@ export class AnalysisService {
     const csv = await this.datasets.readCsv(input.datasetId);
     const table = parseCsv(csv.toString('utf8'));
     const plan = this.validatePlan(table, input);
-    const { token, expiresAt } = this.tokenService.issue(plan, hashDataset(csv));
-    return { plan, planToken: token, expiresAt };
+    const { token, expiresAt } = this.tokenService.issueReview(plan, hashDataset(csv));
+    return { plan, reviewToken: token, expiresAt };
   }
 
-  async confirm(planToken: string): Promise<ConfirmAnalysisPlanResponse> {
-    const approved = await this.prepareRun(planToken);
+  async confirm(reviewToken: string): Promise<ConfirmAnalysisPlanResponse> {
+    const reviewed = await this.prepareToken(reviewToken, 'review');
+    const execution = this.tokenService.issueExecution(reviewed.signedPlan);
     return {
       approved: true,
-      plan: approved.plan,
-      expiresAt: approved.expiresAt,
+      plan: reviewed.plan,
+      executionToken: execution.token,
+      expiresAt: execution.expiresAt,
     };
   }
 
-  async prepareRun(planToken: string): Promise<{ plan: AnalysisPlan; csv: Buffer; expiresAt: string }> {
-    const signedPlan = this.tokenService.verify(planToken);
+  async prepareRun(executionToken: string): Promise<{ plan: AnalysisPlan; csv: Buffer; expiresAt: string }> {
+    const prepared = await this.prepareToken(executionToken, 'execution');
+    return { plan: prepared.plan, csv: prepared.csv, expiresAt: prepared.expiresAt };
+  }
+
+  private async prepareToken(
+    token: string,
+    expectedPurpose: 'review' | 'execution',
+  ): Promise<{ signedPlan: ReturnType<PlanTokenService['verify']>; plan: AnalysisPlan; csv: Buffer; expiresAt: string }> {
+    const signedPlan = this.tokenService.verify(token);
+    if (signedPlan.purpose !== expectedPurpose) {
+      if (expectedPurpose === 'execution') {
+        throw new AnalysisPlanError('Explicit user approval is required before this analysis can run. Confirm the review token first.');
+      }
+      throw new AnalysisPlanError('An execution token cannot be confirmed again. Create a new analysis plan.');
+    }
     const csv = await this.datasets.readCsv(signedPlan.plan.datasetId);
     if (!constantTimeEqual(hashDataset(csv), signedPlan.datasetHash)) {
       throw new AnalysisPlanError('The selected dataset has changed. Create and approve a new analysis plan.');
     }
     return {
+      signedPlan,
       plan: signedPlan.plan,
       csv,
       expiresAt: new Date(signedPlan.expiresAt).toISOString(),
@@ -140,6 +157,13 @@ export class AnalysisService {
 
     const predictionWarnings = this.validatePredictionRows(input.predictionRows, input.featureColumns, inspections);
     const warnings: string[] = [...predictionWarnings];
+    if (rowsWithTarget.length < this.limits.smallDatasetWarningRows) {
+      warnings.push(`Only ${rowsWithTarget.length} usable row(s) are available; estimates may be unstable for this small dataset.`);
+    }
+    warnings.push(
+      'Selected features may omit important explanatory factors; results describe associations, not causes.',
+      'Historical data may reflect bias or unequal outcomes; do not use this result as the sole basis for high-impact decisions.',
+    );
     if (missingTarget) {
       warnings.push(`${missingTarget} row(s) with a missing target will be excluded before training.`);
     }

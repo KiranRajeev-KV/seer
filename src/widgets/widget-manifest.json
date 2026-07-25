@@ -34,7 +34,7 @@
           "name": "Employee compensation regression",
           "description": "A linear-regression plan awaiting user approval.",
           "data": {
-            "planToken": "example-plan-token",
+            "reviewToken": "example-review-token",
             "plan": {
               "datasetId": "employee-compensation",
               "question": "What salary is estimated for a developer with ten years of experience?",

@@ -53,26 +53,27 @@ export type AnalysisPlan = z.infer<typeof analysisPlanSchema>;
 
 export const createAnalysisPlanResponseSchema = z.object({
   plan: analysisPlanSchema,
-  planToken: z.string().min(1),
+  reviewToken: z.string().min(1),
   expiresAt: z.string().datetime(),
 });
 
 export type CreateAnalysisPlanResponse = z.infer<typeof createAnalysisPlanResponseSchema>;
 
 export const confirmAnalysisPlanInputSchema = z.object({
-  planToken: z.string().min(1),
+  reviewToken: z.string().min(1),
 }).strict();
 
 export const confirmAnalysisPlanResponseSchema = z.object({
   approved: z.literal(true),
   plan: analysisPlanSchema,
+  executionToken: z.string().min(1),
   expiresAt: z.string().datetime(),
 });
 
 export type ConfirmAnalysisPlanResponse = z.infer<typeof confirmAnalysisPlanResponseSchema>;
 
 export const runAnalysisInputSchema = z.object({
-  planToken: z.string().min(1),
+  executionToken: z.string().min(1),
 }).strict();
 
 export const runAnalysisResponseSchema = z.discriminatedUnion('taskType', [
@@ -83,7 +84,8 @@ export const runAnalysisResponseSchema = z.discriminatedUnion('taskType', [
 export type RunAnalysisResponse = z.infer<typeof runAnalysisResponseSchema>;
 
 export const signedAnalysisPlanSchema = z.object({
-  version: z.literal(1),
+  version: z.literal(2),
+  purpose: z.enum(['review', 'execution']),
   datasetHash: z.string().regex(/^[a-f0-9]{64}$/),
   issuedAt: z.number().int().nonnegative(),
   expiresAt: z.number().int().positive(),

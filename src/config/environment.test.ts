@@ -22,6 +22,7 @@ test('loads configurable analysis limits with safe defaults', () => {
     maxEncodedFeatures: 500,
     maxPredictionRows: 10,
     minUsableRows: 20,
+    smallDatasetWarningRows: 100,
     maxClassificationClasses: 10,
   });
 });

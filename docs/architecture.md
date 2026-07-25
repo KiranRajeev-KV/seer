@@ -32,10 +32,10 @@ sequenceDiagram
   P-->>M: profile facts and warnings
   M-->>H: profile widget data
   H->>M: create_analysis_plan(...)
-  M-->>H: validated plan + signed 15-minute token
-  H->>M: confirm_analysis_plan(token)
-  M-->>H: confirmed plan
-  H->>M: run_analysis(token)
+  M-->>H: validated plan + signed review token
+  H->>M: confirm_analysis_plan(review token)
+  M-->>H: signed execution token
+  H->>M: run_analysis(execution token)
   M->>M: verify signature, expiration, dataset hash
   M->>P: CSV + approved plan
   P-->>M: metrics, predictions, charts, warnings
@@ -54,9 +54,13 @@ sequenceDiagram
 ## Security model
 
 - The MCP server is the trust boundary for dataset selection and plan approval.
-- `ANALYSIS_PLAN_TOKEN_SECRET` signs a versioned plan containing its dataset
-  hash and 15-minute expiry. `run_analysis` rejects tampered, expired, or
+- `ANALYSIS_PLAN_TOKEN_SECRET` signs versioned review and execution tokens
+  containing the dataset hash and a 15-minute expiry. `run_analysis` accepts
+  only execution tokens and rejects review, tampered, expired, or
   dataset-mismatched tokens.
+- The compatible host or approval widget must collect explicit user approval
+  before calling `confirm_analysis_plan`. The installed NitroStack runtime does
+  not expose MCP elicitation, so it cannot independently attest a human click.
 - `ML_SERVICE_API_KEY` is a separate shared bearer secret required by the ML
   service. It is sent only over HTTPS outside local development.
 - Request IDs provide correlation across services without logging CSV contents

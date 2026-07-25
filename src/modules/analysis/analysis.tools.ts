@@ -37,12 +37,12 @@ export class AnalysisTools {
 
   @Tool({
     name: 'confirm_analysis_plan',
-    description: 'Confirm a user-approved Seer analysis plan. Verifies its signature, expiration, and dataset hash; it does not train a model.',
+    description: 'After the user explicitly approves a Seer plan, exchange its review token for an execution token. This verifies signature, expiration, and dataset hash; it does not train a model.',
     inputSchema: confirmAnalysisPlanInputSchema,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   })
   async confirmAnalysisPlan(input: z.infer<typeof confirmAnalysisPlanInputSchema>, context: ExecutionContext) {
-    const result = await this.analysis.confirm(input.planToken);
+    const result = await this.analysis.confirm(input.reviewToken);
     context.logger.info('Analysis plan confirmed', {
       datasetId: result.plan.datasetId,
       taskType: result.plan.taskType,
@@ -53,7 +53,7 @@ export class AnalysisTools {
 
   @Tool({
     name: 'run_analysis',
-    description: 'Execute an approved Seer regression or classification plan. Verifies its signed token and dataset hash, then trains and evaluates the model through the ML service.',
+    description: 'Execute a Seer regression or classification plan only with an execution token returned after explicit user approval. It verifies the signed token and dataset hash, then trains and evaluates through the ML service.',
     inputSchema: runAnalysisInputSchema,
     outputSchema: runAnalysisResponseSchema,
     taskSupport: 'optional',
@@ -64,7 +64,7 @@ export class AnalysisTools {
     try {
       context.task?.updateProgress('Validating dataset');
       context.task?.throwIfCancelled();
-      const approved = await this.analysis.prepareRun(input.planToken);
+      const approved = await this.analysis.prepareRun(input.executionToken);
       context.task?.updateProgress('Preparing train and test sets');
       context.task?.throwIfCancelled();
       context.task?.updateProgress('Fitting preprocessing pipeline');

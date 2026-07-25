@@ -27,15 +27,31 @@ export class PlanTokenService {
     return service;
   }
 
-  issue(plan: AnalysisPlan, datasetHash: string): { token: string; expiresAt: string } {
+  issueReview(plan: AnalysisPlan, datasetHash: string): { token: string; expiresAt: string } {
     const issuedAt = this.now();
     const payload: SignedAnalysisPlan = {
-      version: 1,
+      version: 2,
+      purpose: 'review',
       datasetHash,
       issuedAt,
       expiresAt: issuedAt + this.config.tokenLifetimeMs,
       plan,
     };
+    return this.sign(payload);
+  }
+
+  issueExecution(review: SignedAnalysisPlan): { token: string; expiresAt: string } {
+    if (review.purpose !== 'review') {
+      throw new PlanTokenError('Only a review token can be confirmed for execution.');
+    }
+    return this.sign({
+      ...review,
+      purpose: 'execution',
+      issuedAt: this.now(),
+    });
+  }
+
+  private sign(payload: SignedAnalysisPlan): { token: string; expiresAt: string } {
     const encodedPayload = Buffer.from(JSON.stringify(payload)).toString('base64url');
     return {
       token: `${encodedPayload}.${this.signature(encodedPayload)}`,

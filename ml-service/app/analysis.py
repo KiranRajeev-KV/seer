@@ -276,6 +276,7 @@ def analyze_regression_csv(raw_csv: bytes, plan: RegressionAnalysisPlan, setting
         *plan.warnings,
         *_prediction_warnings(predictions),
         *_regression_quality_warnings(quality, model_metrics),
+        *_safety_warnings(len(usable), settings),
         "Predictions are estimates based on historical dataset patterns; they are not guarantees.",
     ]))
     return RegressionAnalysisResponse(
@@ -356,6 +357,7 @@ def analyze_classification_csv(raw_csv: bytes, plan: ClassificationAnalysisPlan,
         *_prediction_warnings(predictions),
         *_classification_quality_warnings(quality),
         *_classification_imbalance_warnings(distribution, settings.class_imbalance_threshold_percent),
+        *_safety_warnings(len(usable), settings),
         "Classifications are estimates based on historical dataset patterns; they are not guarantees.",
     ]))
     return ClassificationAnalysisResponse(
@@ -577,3 +579,13 @@ def _classification_imbalance_warnings(distribution: list[ClassDistribution], th
             f"Class '{minority.classLabel}' represents {minority.percentage:.1f}% of usable rows, below the {threshold_percent:.1f}% imbalance threshold."
         ]
     return []
+
+
+def _safety_warnings(usable_rows: int, settings: Settings) -> list[str]:
+    warnings = [
+        "Selected features may omit important explanatory factors; results describe associations, not causes.",
+        "Historical data may reflect bias or unequal outcomes; do not use this result as the sole basis for high-impact decisions.",
+    ]
+    if usable_rows < settings.small_dataset_warning_rows:
+        warnings.insert(0, f"Only {usable_rows} usable row(s) are available; estimates may be unstable for this small dataset.")
+    return warnings
