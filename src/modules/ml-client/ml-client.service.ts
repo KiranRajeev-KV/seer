@@ -2,10 +2,13 @@ import { Injectable } from '@nitrostack/core';
 import { loadMlServiceConfig, type MlServiceConfig } from '../../config/environment.js';
 import {
   mlServiceHealthSchema,
+  mlServiceRegressionAnalysisSchema,
   mlServiceProfileSchema,
   type MlServiceHealth,
+  type MlServiceRegressionAnalysis,
   type MlServiceProfile,
 } from './ml-client.schemas.js';
+import type { AnalysisPlan } from '../analysis/analysis.schemas.js';
 
 interface HttpResponse {
   ok: boolean;
@@ -68,7 +71,7 @@ export class MlClientService {
     body.set('dataset_id', datasetId);
     body.set('file', new Blob([csv], { type: 'text/csv' }), `${datasetId}.csv`);
 
-    const response = await this.request('/v1/profile', {
+    const response = await this.request('/v1/profile', 'profile', {
       method: 'POST',
       body,
     });
@@ -86,7 +89,31 @@ export class MlClientService {
     return parsed.data;
   }
 
-  private async request(path: string, request: { method?: string; body?: FormData } = {}): Promise<HttpResponse> {
+  async analyze(plan: AnalysisPlan, csv: Buffer): Promise<MlServiceRegressionAnalysis> {
+    const body = new FormData();
+    body.set('plan', JSON.stringify(plan));
+    body.set('file', new Blob([csv], { type: 'text/csv' }), `${plan.datasetId}.csv`);
+
+    const response = await this.request('/v1/analyze', 'analysis', {
+      method: 'POST',
+      body,
+    });
+    if (!response.ok) {
+      throw new MlServiceError('upstream_error', `ML service analysis failed with status ${response.status}.`);
+    }
+    const payload = await this.readJson(response, 'analysis');
+    const parsed = mlServiceRegressionAnalysisSchema.safeParse(payload);
+    if (!parsed.success) {
+      throw new MlServiceError('invalid_response', 'ML service returned an invalid analysis response.');
+    }
+    return parsed.data;
+  }
+
+  private async request(
+    path: string,
+    operation: 'health' | 'profile' | 'analysis' = 'health',
+    request: { method?: string; body?: FormData } = {},
+  ): Promise<HttpResponse> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
 
@@ -102,7 +129,7 @@ export class MlClientService {
       }
 
       if (error instanceof Error && error.name === 'AbortError') {
-        throw new MlServiceError('timeout', 'ML service health check timed out.');
+        throw new MlServiceError('timeout', `ML service ${operation} request timed out.`);
       }
 
       throw new MlServiceError('unavailable', 'ML service is unavailable.');
@@ -111,7 +138,7 @@ export class MlClientService {
     }
   }
 
-  private async readJson(response: HttpResponse, operation: 'health' | 'profile'): Promise<unknown> {
+  private async readJson(response: HttpResponse, operation: 'health' | 'profile' | 'analysis'): Promise<unknown> {
     try {
       return await response.json();
     } catch {

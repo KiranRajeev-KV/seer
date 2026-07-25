@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { mlServiceRegressionAnalysisSchema } from '../ml-client/ml-client.schemas.js';
 
 export const taskTypeSchema = z.enum(['regression', 'classification']);
 export type TaskType = z.infer<typeof taskTypeSchema>;
@@ -69,6 +70,17 @@ export const confirmAnalysisPlanResponseSchema = z.object({
 });
 
 export type ConfirmAnalysisPlanResponse = z.infer<typeof confirmAnalysisPlanResponseSchema>;
+
+export const runAnalysisInputSchema = z.object({
+  planToken: z.string().min(1),
+}).strict();
+
+export const runAnalysisResponseSchema = mlServiceRegressionAnalysisSchema.extend({
+  question: z.string().min(1),
+  targetColumn: z.string().min(1),
+});
+
+export type RunAnalysisResponse = z.infer<typeof runAnalysisResponseSchema>;
 
 export const signedAnalysisPlanSchema = z.object({
   version: z.literal(1),

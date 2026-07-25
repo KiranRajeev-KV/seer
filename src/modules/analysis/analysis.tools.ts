@@ -4,12 +4,18 @@ import {
   confirmAnalysisPlanResponseSchema,
   createAnalysisPlanInputSchema,
   createAnalysisPlanResponseSchema,
+  runAnalysisInputSchema,
+  runAnalysisResponseSchema,
 } from './analysis.schemas.js';
-import { AnalysisService } from './analysis.service.js';
+import { AnalysisPlanError, AnalysisService } from './analysis.service.js';
+import { MlClientService, MlServiceError } from '../ml-client/ml-client.service.js';
 
-@Injectable({ deps: [AnalysisService] })
+@Injectable({ deps: [AnalysisService, MlClientService] })
 export class AnalysisTools {
-  constructor(private readonly analysis: AnalysisService) {}
+  constructor(
+    private readonly analysis: AnalysisService,
+    private readonly mlClient: MlClientService,
+  ) {}
 
   @Tool({
     name: 'create_analysis_plan',
@@ -45,5 +51,47 @@ export class AnalysisTools {
       requestId: context.requestId,
     });
     return result;
+  }
+
+  @Tool({
+    name: 'run_analysis',
+    description: 'Execute an approved Seer regression plan. Verifies its signed token and dataset hash, then trains and evaluates the model through the ML service.',
+    inputSchema: runAnalysisInputSchema,
+    outputSchema: runAnalysisResponseSchema,
+    taskSupport: 'optional',
+    annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+  })
+  @Widget('regression-results')
+  async runAnalysis(input: z.infer<typeof runAnalysisInputSchema>, context: ExecutionContext) {
+    try {
+      context.task?.updateProgress('Validating dataset');
+      context.task?.throwIfCancelled();
+      const approved = await this.analysis.prepareRun(input.planToken);
+      if (approved.plan.taskType !== 'regression') {
+        throw new AnalysisPlanError('Classification execution is not available until Phase 4.');
+      }
+      context.task?.updateProgress('Preparing train and test sets');
+      context.task?.throwIfCancelled();
+      context.task?.updateProgress('Fitting preprocessing pipeline');
+      context.task?.updateProgress('Training model');
+      const result = await this.mlClient.analyze(approved.plan, approved.csv);
+      context.task?.throwIfCancelled();
+      context.task?.updateProgress('Training baseline');
+      context.task?.updateProgress('Evaluating models');
+      context.task?.updateProgress('Generating predictions');
+      context.task?.updateProgress('Preparing visualisations');
+      context.logger.info('Regression analysis completed', {
+        datasetId: approved.plan.datasetId,
+        targetColumn: approved.plan.targetColumn,
+        analysisId: result.analysisId,
+        quality: result.quality,
+        requestId: context.requestId,
+      });
+      return { ...result, question: approved.plan.question, targetColumn: approved.plan.targetColumn };
+    } catch (error) {
+      const code = error instanceof MlServiceError ? error.code : 'analysis_error';
+      context.logger.error('Regression analysis failed', { code, requestId: context.requestId });
+      throw error;
+    }
   }
 }

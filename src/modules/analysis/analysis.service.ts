@@ -55,14 +55,23 @@ export class AnalysisService {
   }
 
   async confirm(planToken: string): Promise<ConfirmAnalysisPlanResponse> {
+    const approved = await this.prepareRun(planToken);
+    return {
+      approved: true,
+      plan: approved.plan,
+      expiresAt: approved.expiresAt,
+    };
+  }
+
+  async prepareRun(planToken: string): Promise<{ plan: AnalysisPlan; csv: Buffer; expiresAt: string }> {
     const signedPlan = this.tokenService.verify(planToken);
     const csv = await this.datasets.readCsv(signedPlan.plan.datasetId);
     if (!constantTimeEqual(hashDataset(csv), signedPlan.datasetHash)) {
       throw new AnalysisPlanError('The selected dataset has changed. Create and approve a new analysis plan.');
     }
     return {
-      approved: true,
       plan: signedPlan.plan,
+      csv,
       expiresAt: new Date(signedPlan.expiresAt).toISOString(),
     };
   }

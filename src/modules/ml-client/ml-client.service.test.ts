@@ -98,3 +98,32 @@ test('rejects malformed profile responses', async () => {
   await assert.rejects(client.profile('employee-compensation', Buffer.from('a\n1\n')),
     (error: unknown) => error instanceof MlServiceError && error.code === 'invalid_response');
 });
+
+test('sends an authenticated multipart regression-analysis request', async () => {
+  let requestUrl = '';
+  let form: FormData | undefined;
+  const client = makeClient(async (input, init) => {
+    requestUrl = input;
+    form = init.body;
+    return new Response(JSON.stringify({
+      analysisId: '00000000-0000-4000-8000-000000000001', taskType: 'regression', model: { name: 'LinearRegression' }, baseline: { name: 'DummyRegressor (mean)' }, quality: 'useful_signal',
+      metrics: { model: { mae: 1, rmse: 1, r2: 0.9 }, baseline: { mae: 2, rmse: 2, r2: 0 }, improvement: { maeAbsolute: 1, maePercent: 50, rmseAbsolute: 1, rmsePercent: 50, r2Absolute: 0.9 } },
+      predictions: [{ input: { years_experience: 10 }, estimatedValue: 100000, coverage: { outsideNumericRanges: [], unseenCategoricalValues: [] } }],
+      charts: { actualVsPredicted: [{ actual: 100000, predicted: 100000 }], residualVsPredicted: [{ predicted: 100000, residual: 0 }] },
+      datasetCoverage: { trainingRows: 24, testRows: 6, numericRanges: { years_experience: { min: 1, max: 20 } }, categoricalValues: {} },
+      warnings: [], explanationFacts: { targetColumn: 'annual_salary', usableRows: 30, droppedMissingTargetRows: 0 },
+    }), { status: 200 });
+  });
+  const plan = {
+    datasetId: 'employee-compensation', question: 'Estimate salary', targetColumn: 'annual_salary', featureColumns: ['years_experience'], taskType: 'regression' as const, predictionRows: [{ years_experience: 10 }],
+    preprocessing: { numeric: ['years_experience'], categorical: [], numericImputer: 'median' as const, numericScaler: 'standard' as const, categoricalImputer: 'most_frequent' as const, categoricalEncoder: 'one_hot' as const },
+    rows: { dataset: 30, missingTarget: 0, usable: 30 }, excludedColumns: [], assumptions: [], warnings: [], split: { trainingPercent: 80 as const, testPercent: 20 as const, randomState: 42 as const },
+  };
+  const result = await client.analyze(plan, Buffer.from('years_experience,annual_salary\n10,100000\n'));
+
+  assert.equal(requestUrl, 'https://seer-ml.example.com/v1/analyze');
+  assert.ok(form);
+  assert.equal(JSON.parse(String(form.get('plan'))).targetColumn, 'annual_salary');
+  assert.equal(await (form.get('file') as Blob).text(), 'years_experience,annual_salary\n10,100000\n');
+  assert.equal(result.quality, 'useful_signal');
+});

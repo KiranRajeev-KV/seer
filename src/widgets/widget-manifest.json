@@ -53,6 +53,33 @@
         }
       ],
       "tags": ["analysis", "machine-learning", "approval"]
+    },
+    {
+      "uri": "/regression-results",
+      "name": "Regression Results",
+      "description": "Transparent linear-regression evaluation, estimates, diagnostics, and limitations.",
+      "examples": [
+        {
+          "name": "Employee compensation regression result",
+          "description": "Linear-regression output compared against a training-mean baseline.",
+          "data": {
+            "analysisId": "00000000-0000-4000-8000-000000000001",
+            "question": "What salary is estimated for a developer with ten years of experience?",
+            "targetColumn": "annual_salary",
+            "taskType": "regression",
+            "model": {"name": "LinearRegression"},
+            "baseline": {"name": "DummyRegressor (mean)"},
+            "quality": "useful_signal",
+            "metrics": {"model": {"mae": 5200, "rmse": 6900, "r2": 0.81}, "baseline": {"mae": 18000, "rmse": 22500, "r2": -0.01}, "improvement": {"maeAbsolute": 12800, "maePercent": 71.1, "rmseAbsolute": 15600, "rmsePercent": 69.3, "r2Absolute": 0.82}},
+            "predictions": [{"input": {"years_experience": 10, "department": "engineering"}, "estimatedValue": 112000, "coverage": {"outsideNumericRanges": [], "unseenCategoricalValues": []}}],
+            "charts": {"actualVsPredicted": [{"actual": 110000, "predicted": 112000}], "residualVsPredicted": [{"predicted": 112000, "residual": -2000}]},
+            "datasetCoverage": {"trainingRows": 1200, "testRows": 300, "numericRanges": {}, "categoricalValues": {}},
+            "warnings": ["Predictions are estimates based on historical dataset patterns; they are not guarantees."],
+            "explanationFacts": {"targetColumn": "annual_salary", "usableRows": 1500, "droppedMissingTargetRows": 0}
+          }
+        }
+      ],
+      "tags": ["analysis", "regression", "machine-learning", "results"]
     }
   ],
   "generatedAt": "2026-07-26T00:00:00.000Z"
