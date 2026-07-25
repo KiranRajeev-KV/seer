@@ -2,10 +2,10 @@ import { Injectable } from '@nitrostack/core';
 import { loadMlServiceConfig, type MlServiceConfig } from '../../config/environment.js';
 import {
   mlServiceHealthSchema,
-  mlServiceRegressionAnalysisSchema,
+  mlServiceAnalysisSchema,
   mlServiceProfileSchema,
   type MlServiceHealth,
-  type MlServiceRegressionAnalysis,
+  type MlServiceAnalysis,
   type MlServiceProfile,
 } from './ml-client.schemas.js';
 import type { AnalysisPlan } from '../analysis/analysis.schemas.js';
@@ -89,7 +89,7 @@ export class MlClientService {
     return parsed.data;
   }
 
-  async analyze(plan: AnalysisPlan, csv: Buffer): Promise<MlServiceRegressionAnalysis> {
+  async analyze(plan: AnalysisPlan, csv: Buffer): Promise<MlServiceAnalysis> {
     const body = new FormData();
     body.set('plan', JSON.stringify(plan));
     body.set('file', new Blob([csv], { type: 'text/csv' }), `${plan.datasetId}.csv`);
@@ -102,7 +102,7 @@ export class MlClientService {
       throw new MlServiceError('upstream_error', `ML service analysis failed with status ${response.status}.`);
     }
     const payload = await this.readJson(response, 'analysis');
-    const parsed = mlServiceRegressionAnalysisSchema.safeParse(payload);
+    const parsed = mlServiceAnalysisSchema.safeParse(payload);
     if (!parsed.success) {
       throw new MlServiceError('invalid_response', 'ML service returned an invalid analysis response.');
     }

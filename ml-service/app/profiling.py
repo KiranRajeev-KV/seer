@@ -140,7 +140,9 @@ def profile_csv(dataset_id: str, raw_csv: bytes, settings: Settings) -> ProfileR
             constant_columns.append(str(name))
         elif _is_identifier(str(name), column_type, len(non_null), unique_count, len(dataframe.index)):
             identifier_candidates.append(str(name))
-        elif column_type == "numeric":
+        elif column_type == "numeric" or (
+            column_type in {"boolean", "categorical"} and 2 <= unique_count <= 10
+        ):
             target_candidates.append(str(name))
 
         if column_type == "datetime":

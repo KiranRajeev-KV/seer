@@ -12,13 +12,13 @@ from fastapi import (
     UploadFile,
     status,
 )
-from pydantic import BaseModel
+from pydantic import BaseModel, TypeAdapter
 
 from .analysis import (
+    AnalysisPlan,
     AnalysisFailure,
-    RegressionAnalysisPlan,
-    RegressionAnalysisResponse,
-    analyze_regression_csv,
+    AnalysisResponse,
+    analyze_csv,
 )
 from .config import Settings
 from .profiling import ProfileFailure, ProfileResponse, profile_csv
@@ -92,14 +92,14 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @app.post(
         "/v1/analyze",
-        response_model=RegressionAnalysisResponse,
+        response_model=AnalysisResponse,
         dependencies=[Depends(require_api_key)],
     )
     async def analyze_dataset(
         request: Request,
         file: UploadFile = File(...),
         plan: str = Form(...),
-    ) -> RegressionAnalysisResponse:
+    ) -> AnalysisResponse:
         settings: Settings = request.app.state.settings
         if file.content_type not in {
             "text/csv",
@@ -113,8 +113,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
         raw_csv = await file.read(settings.max_csv_bytes + 1)
         try:
-            parsed_plan = RegressionAnalysisPlan.model_validate_json(plan)
-            return analyze_regression_csv(raw_csv, parsed_plan, settings)
+            parsed_plan = TypeAdapter(AnalysisPlan).validate_json(plan)
+            return analyze_csv(raw_csv, parsed_plan, settings)
         except AnalysisFailure as error:
             raise HTTPException(
                 status_code=error.status_code, detail=error.detail

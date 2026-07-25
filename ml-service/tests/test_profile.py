@@ -34,7 +34,7 @@ EMP003,8,engineering,110000,mentors teammates
     assert body["dimensions"] == {"rows": 4, "columns": 5}
     assert body["duplicateRowCount"] == 1
     assert body["identifierCandidates"] == ["employee_id"]
-    assert body["targetCandidates"] == ["years_experience", "annual_salary"]
+    assert body["targetCandidates"] == ["years_experience", "department", "annual_salary"]
     columns = {column["name"]: column for column in body["columns"]}
     assert columns["years_experience"]["type"] == "numeric"
     assert columns["years_experience"]["missingCount"] == 1

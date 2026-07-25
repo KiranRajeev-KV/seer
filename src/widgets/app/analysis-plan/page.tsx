@@ -113,8 +113,8 @@ export default function AnalysisPlanWidget() {
 
       {[...data.plan.assumptions, ...data.plan.warnings].map((message) => <div key={message} style={{ background: colors.warning, border: `1px solid ${dark ? '#6b3b12' : '#fed7aa'}`, borderRadius: 8, padding: '9px 11px', fontSize: 13, marginTop: 10 }}>{message}</div>)}
 
-      {status === 'approved' ? <div style={{ background: colors.success, border: `1px solid ${dark ? '#1c7053' : '#86efac'}`, borderRadius: 9, padding: 12, marginTop: 12, fontWeight: 700 }}>Regression analysis completed. Review the results widget for model quality, predictions, and limitations.</div> : <Section title="Your approval" colors={colors}>
-        <p style={{ color: colors.muted, fontSize: 13, marginTop: 0 }}>Approval verifies the signed plan, confirms the packaged dataset is unchanged, then trains and evaluates the regression model.</p>
+      {status === 'approved' ? <div style={{ background: colors.success, border: `1px solid ${dark ? '#1c7053' : '#86efac'}`, borderRadius: 9, padding: 12, marginTop: 12, fontWeight: 700 }}>Analysis completed. Review the results widget for model quality, predictions, and limitations.</div> : <Section title="Your approval" colors={colors}>
+        <p style={{ color: colors.muted, fontSize: 13, marginTop: 0 }}>Approval verifies the signed plan, confirms the packaged dataset is unchanged, then trains and evaluates the selected model.</p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="button" onClick={approve} disabled={status === 'approving'} style={buttonStyle('#0284c7', '#ffffff')}>{status === 'approving' ? 'Running analysis…' : 'Approve and run analysis'}</button>
           <button type="button" onClick={reject} style={buttonStyle(dark ? '#253b55' : '#e2e8f0', colors.ink)}>Request changes</button>

@@ -72,6 +72,8 @@ export const mlServiceProfileSchema = z.object({
 
 export type MlServiceProfile = z.infer<typeof mlServiceProfileSchema>;
 
+const analysisInputValueSchema = z.union([z.string(), z.number().finite(), z.boolean()]);
+
 const regressionMetricSchema = z.object({
   mae: z.number().finite().nonnegative(),
   rmse: z.number().finite().nonnegative(),
@@ -96,7 +98,7 @@ export const mlServiceRegressionAnalysisSchema = z.object({
     }),
   }),
   predictions: z.array(z.object({
-    input: z.record(z.union([z.string(), z.number().finite(), z.boolean()])),
+    input: z.record(analysisInputValueSchema),
     estimatedValue: z.number().finite(),
     coverage: z.object({
       outsideNumericRanges: z.array(z.string()),
@@ -122,3 +124,79 @@ export const mlServiceRegressionAnalysisSchema = z.object({
 });
 
 export type MlServiceRegressionAnalysis = z.infer<typeof mlServiceRegressionAnalysisSchema>;
+
+const classificationMetricSchema = z.object({
+  accuracy: z.number().finite().min(0).max(1),
+  precision: z.number().finite().min(0).max(1),
+  recall: z.number().finite().min(0).max(1),
+  f1: z.number().finite().min(0).max(1),
+});
+
+export const mlServiceClassificationAnalysisSchema = z.object({
+  analysisId: z.string().uuid(),
+  taskType: z.literal('classification'),
+  model: z.object({ name: z.literal('LogisticRegression') }),
+  baseline: z.object({ name: z.literal('DummyClassifier (most_frequent)') }),
+  quality: z.enum(['useful_signal', 'weak_signal', 'no_demonstrated_signal']),
+  metrics: z.object({
+    model: classificationMetricSchema,
+    baseline: classificationMetricSchema,
+    improvement: z.object({
+      f1Absolute: z.number().finite(),
+      f1Percent: z.number().finite(),
+    }),
+  }),
+  predictions: z.array(z.object({
+    input: z.record(analysisInputValueSchema),
+    predictedClass: z.string().min(1),
+    predictedProbability: z.number().finite().min(0).max(1),
+    coverage: z.object({
+      outsideNumericRanges: z.array(z.string()),
+      unseenCategoricalValues: z.array(z.string()),
+    }),
+  })).min(1).max(10),
+  charts: z.object({
+    confusionMatrix: z.object({
+      labels: z.array(z.string().min(1)).min(2).max(10),
+      values: z.array(z.array(z.number().int().nonnegative())).min(2).max(10),
+    }).superRefine((matrix, context) => {
+      if (matrix.values.length !== matrix.labels.length || matrix.values.some((row) => row.length !== matrix.labels.length)) {
+        context.addIssue({ code: z.ZodIssueCode.custom, message: 'Confusion matrix must be square and match its labels.' });
+      }
+    }),
+    classDistribution: z.array(z.object({
+      classLabel: z.string().min(1),
+      count: z.number().int().positive(),
+      percentage: z.number().finite().min(0).max(100),
+    })).min(2).max(10),
+  }),
+  perClassMetrics: z.array(z.object({
+    classLabel: z.string().min(1),
+    precision: z.number().finite().min(0).max(1),
+    recall: z.number().finite().min(0).max(1),
+    f1: z.number().finite().min(0).max(1),
+    support: z.number().int().nonnegative(),
+  })).min(2).max(10),
+  datasetCoverage: z.object({
+    trainingRows: z.number().int().positive(),
+    testRows: z.number().int().positive(),
+    numericRanges: z.record(z.object({ min: z.number().finite(), max: z.number().finite() })),
+    categoricalValues: z.record(z.array(z.string())),
+  }),
+  warnings: z.array(z.string()),
+  explanationFacts: z.object({
+    targetColumn: z.string(),
+    usableRows: z.number().int().positive(),
+    droppedMissingTargetRows: z.number().int().nonnegative(),
+    classCount: z.number().int().min(2).max(10),
+  }),
+});
+
+export type MlServiceClassificationAnalysis = z.infer<typeof mlServiceClassificationAnalysisSchema>;
+
+export const mlServiceAnalysisSchema = z.discriminatedUnion('taskType', [
+  mlServiceRegressionAnalysisSchema,
+  mlServiceClassificationAnalysisSchema,
+]);
+
+export type MlServiceAnalysis = z.infer<typeof mlServiceAnalysisSchema>;

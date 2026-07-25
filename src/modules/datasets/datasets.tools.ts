@@ -4,7 +4,7 @@ import { MlClientService, MlServiceError } from '../ml-client/ml-client.service.
 import { DatasetsService } from './datasets.service.js';
 
 const profileDatasetInputSchema = z.object({
-  datasetId: z.literal('employee-compensation').describe('An approved dataset ID from seer://datasets.'),
+  datasetId: z.enum(['employee-compensation', 'employee-attrition']).describe('An approved dataset ID from seer://datasets.'),
 }).strict();
 
 @Injectable({ deps: [DatasetsService, MlClientService] })

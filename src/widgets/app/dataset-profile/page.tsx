@@ -121,7 +121,7 @@ export default function DatasetProfileWidget() {
       </Section>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(230px, 1fr))', gap: 12, marginTop: 12 }}>
-        <CandidateList title="Numeric target candidates" values={data.targetCandidates} empty="No eligible numeric targets found." colors={colors} />
+        <CandidateList title="Eligible target candidates" values={data.targetCandidates} empty="No eligible targets found." colors={colors} />
         <CandidateList title="Identifier candidates" values={data.identifierCandidates} empty="No identifier-like columns found." colors={colors} />
         <CandidateList title="Excluded columns" values={[...data.constantColumns, ...data.unsupportedColumns.map((column) => column.name)]} empty="No columns excluded by profiling." colors={colors} />
       </div>

@@ -1,4 +1,10 @@
-from app.analysis import AnalysisFailure, RegressionAnalysisPlan, analyze_regression_csv
+from app.analysis import (
+    AnalysisFailure,
+    ClassificationAnalysisPlan,
+    RegressionAnalysisPlan,
+    analyze_classification_csv,
+    analyze_regression_csv,
+)
 from app.config import Settings
 from app.main import create_app
 from fastapi.testclient import TestClient
@@ -31,6 +37,29 @@ def regression_csv() -> bytes:
 
 def settings() -> Settings:
     return Settings(api_key="test-secret")
+
+
+def make_classification_plan(prediction_rows: list[dict[str, str | int | float | bool]] | None = None) -> ClassificationAnalysisPlan:
+    return ClassificationAnalysisPlan.model_validate({
+        "datasetId": "employee-attrition",
+        "question": "Is this employee likely to leave?",
+        "targetColumn": "attrition",
+        "featureColumns": ["tenure_years", "monthly_hours", "department"],
+        "taskType": "classification",
+        "predictionRows": prediction_rows or [{"tenure_years": 2, "monthly_hours": 228, "department": "sales"}],
+        "preprocessing": {"numeric": ["tenure_years", "monthly_hours"], "categorical": ["department"], "numericImputer": "median", "numericScaler": "standard", "categoricalImputer": "most_frequent", "categoricalEncoder": "one_hot"},
+        "warnings": [],
+        "split": {"trainingPercent": 80, "testPercent": 20, "randomState": 42},
+    })
+
+
+def classification_csv() -> bytes:
+    rows = ["tenure_years,monthly_hours,department,attrition"]
+    for index in range(30):
+        rows.append(f"{index % 5 + 1},{218 + index % 18},sales,leave")
+    for index in range(30):
+        rows.append(f"{index % 8 + 5},{165 + index % 22},engineering,stay")
+    return ("\n".join(rows) + "\n").encode()
 
 
 def test_mixed_feature_regression_returns_metrics_predictions_and_diagnostics() -> None:
@@ -106,3 +135,46 @@ def test_analyze_endpoint_accepts_the_full_signed_plan_shape() -> None:
 
     assert response.status_code == 200
     assert response.json()["taskType"] == "regression"
+
+
+def test_mixed_feature_classification_returns_probabilities_and_evaluation() -> None:
+    result = analyze_classification_csv(classification_csv(), make_classification_plan(), settings())
+
+    assert result.taskType == "classification"
+    assert result.model["name"] == "LogisticRegression"
+    assert result.baseline["name"] == "DummyClassifier (most_frequent)"
+    assert result.datasetCoverage.trainingRows == 48
+    assert result.datasetCoverage.testRows == 12
+    assert result.metrics.model.f1 > result.metrics.baseline.f1
+    assert result.quality == "useful_signal"
+    assert result.predictions[0].predictedClass in {"leave", "stay"}
+    assert 0 <= result.predictions[0].predictedProbability <= 1
+    assert result.charts.confusionMatrix.labels == ["leave", "stay"]
+    assert len(result.perClassMetrics) == 2
+
+
+def test_classification_rejects_a_class_without_enough_rows() -> None:
+    csv = b"tenure_years,monthly_hours,department,attrition\n" + b"\n".join(
+        [b"1,220,sales,leave"] * 19 + [b"8,170,engineering,stay"]
+    )
+    with pytest.raises(AnalysisFailure, match="at least two usable rows"):
+        analyze_classification_csv(csv, make_classification_plan(), settings())
+
+
+def test_classification_endpoint_accepts_the_full_signed_plan_shape() -> None:
+    full_plan = make_classification_plan().model_dump()
+    full_plan.update({
+        "rows": {"dataset": 60, "missingTarget": 0, "usable": 60},
+        "excludedColumns": [],
+        "assumptions": [],
+    })
+    with TestClient(create_app(settings())) as client:
+        response = client.post(
+            "/v1/analyze",
+            headers={"Authorization": "Bearer test-secret"},
+            files={"file": ("employee-attrition.csv", classification_csv(), "text/csv")},
+            data={"plan": json.dumps(full_plan)},
+        )
+
+    assert response.status_code == 200
+    assert response.json()["taskType"] == "classification"

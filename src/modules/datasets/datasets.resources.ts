@@ -24,4 +24,14 @@ export class DatasetsResources {
   async getEmployeeCompensationCsv(_uri: string, _context: ExecutionContext) {
     return this.datasets.readCsvText('employee-compensation');
   }
+
+  @Resource({
+    uri: 'seer://datasets/employee-attrition',
+    name: 'Employee Attrition CSV',
+    description: 'Synthetic employee attrition data for eligible supervised-learning classification.',
+    mimeType: 'text/csv',
+  })
+  async getEmployeeAttritionCsv(_uri: string, _context: ExecutionContext) {
+    return this.datasets.readCsvText('employee-attrition');
+  }
 }

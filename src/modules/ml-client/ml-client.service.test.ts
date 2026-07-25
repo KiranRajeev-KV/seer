@@ -127,3 +127,25 @@ test('sends an authenticated multipart regression-analysis request', async () =>
   assert.equal(await (form.get('file') as Blob).text(), 'years_experience,annual_salary\n10,100000\n');
   assert.equal(result.quality, 'useful_signal');
 });
+
+test('validates a classification-analysis response', async () => {
+  const client = makeClient(async () => new Response(JSON.stringify({
+    analysisId: '00000000-0000-4000-8000-000000000002', taskType: 'classification', model: { name: 'LogisticRegression' }, baseline: { name: 'DummyClassifier (most_frequent)' }, quality: 'useful_signal',
+    metrics: { model: { accuracy: 1, precision: 1, recall: 1, f1: 1 }, baseline: { accuracy: 0.5, precision: 0.25, recall: 0.5, f1: 1 / 3 }, improvement: { f1Absolute: 2 / 3, f1Percent: 200 } },
+    predictions: [{ input: { tenure_years: 2 }, predictedClass: 'leave', predictedProbability: 0.9, coverage: { outsideNumericRanges: [], unseenCategoricalValues: [] } }],
+    charts: { confusionMatrix: { labels: ['leave', 'stay'], values: [[2, 0], [0, 2]] }, classDistribution: [{ classLabel: 'leave', count: 30, percentage: 50 }, { classLabel: 'stay', count: 30, percentage: 50 }] },
+    perClassMetrics: [{ classLabel: 'leave', precision: 1, recall: 1, f1: 1, support: 2 }, { classLabel: 'stay', precision: 1, recall: 1, f1: 1, support: 2 }],
+    datasetCoverage: { trainingRows: 48, testRows: 12, numericRanges: {}, categoricalValues: {} }, warnings: [],
+    explanationFacts: { targetColumn: 'attrition', usableRows: 60, droppedMissingTargetRows: 0, classCount: 2 },
+  }), { status: 200 }));
+  const plan = {
+    datasetId: 'employee-attrition', question: 'Will this employee leave?', targetColumn: 'attrition', featureColumns: ['tenure_years'], taskType: 'classification' as const, predictionRows: [{ tenure_years: 2 }],
+    preprocessing: { numeric: ['tenure_years'], categorical: [], numericImputer: 'median' as const, numericScaler: 'standard' as const, categoricalImputer: 'most_frequent' as const, categoricalEncoder: 'one_hot' as const },
+    rows: { dataset: 60, missingTarget: 0, usable: 60 }, excludedColumns: [], assumptions: [], warnings: [], split: { trainingPercent: 80 as const, testPercent: 20 as const, randomState: 42 as const },
+  };
+
+  const result = await client.analyze(plan, Buffer.from('tenure_years,attrition\n2,leave\n'));
+
+  assert.equal(result.taskType, 'classification');
+  assert.equal(result.predictions[0]?.predictedProbability, 0.9);
+});
