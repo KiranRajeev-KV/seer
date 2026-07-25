@@ -1,0 +1,13 @@
+{
+  "datasets": [
+    {
+      "id": "employee-compensation",
+      "name": "Employee Compensation",
+      "description": "Synthetic employee compensation data with numeric and categorical features.",
+      "taskHints": ["regression"],
+      "rows": 1500,
+      "columns": 9,
+      "fileName": "employee-compensation.csv"
+    }
+  ]
+}

@@ -1,5 +1,6 @@
 import { McpApp, Module, ConfigModule } from '@nitrostack/core';
 import { SystemHealthCheck } from './health/system.health.js';
+import { DatasetsModule } from './modules/datasets/datasets.module.js';
 import { MlClientModule } from './modules/ml-client/ml-client.module.js';
 
 /**
@@ -20,7 +21,8 @@ import { MlClientModule } from './modules/ml-client/ml-client.module.js';
   description: 'Root application module',
   imports: [
     ConfigModule.forRoot(),
-    MlClientModule
+    MlClientModule,
+    DatasetsModule,
   ],
   providers: [
     SystemHealthCheck,

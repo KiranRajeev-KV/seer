@@ -6,13 +6,13 @@
   "description": "Seer MCP server for transparent CSV-based predictive analysis",
   "scripts": {
     "dev": "nitrostack-cli dev",
-    "build": "nitrostack-cli build",
+    "build": "nitrostack-cli build && node scripts/copy-data.mjs",
     "start": "npm run build && nitrostack-cli start",
     "start:prod": "nitrostack-cli start",
     "upgrade": "nitrostack-cli upgrade",
     "install:all": "nitrostack-cli install",
     "widget": "npm --prefix src/widgets",
-    "test:unit": "npm run build && node --test dist/config/environment.test.js dist/modules/ml-client/ml-client.service.test.js"
+    "test:unit": "npm run build && node --test dist/config/environment.test.js dist/modules/ml-client/ml-client.service.test.js dist/modules/datasets/datasets.service.test.js dist/modules/datasets/datasets.resources.test.js dist/modules/datasets/datasets.tools.test.js"
   },
   "dependencies": {
     "dotenv": "^16.3.1",

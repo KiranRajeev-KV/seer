@@ -6,9 +6,11 @@ build-backend = "setuptools.build_meta"
 name = "seer-ml"
 version = "0.1.0"
 description = "Seer ML service"
-requires-python = ">=3.11"
+requires-python = ">=3.12,<3.13"
 dependencies = [
   "fastapi==0.115.6",
+  "pandas==2.2.3",
+  "python-multipart==0.0.20",
   "uvicorn[standard]==0.34.0",
 ]
 

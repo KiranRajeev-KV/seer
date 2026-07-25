@@ -3,7 +3,7 @@ import { z } from 'zod';
 const environmentSchema = z.object({
   ML_SERVICE_BASE_URL: z.string().url(),
   ML_SERVICE_API_KEY: z.string().min(1),
-  ML_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
+  ML_SERVICE_TIMEOUT_MS: z.coerce.number().int().positive().default(120_000),
 });
 
 export interface MlServiceConfig {

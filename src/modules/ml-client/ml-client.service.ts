@@ -1,6 +1,11 @@
 import { Injectable } from '@nitrostack/core';
 import { loadMlServiceConfig, type MlServiceConfig } from '../../config/environment.js';
-import { mlServiceHealthSchema, type MlServiceHealth } from './ml-client.schemas.js';
+import {
+  mlServiceHealthSchema,
+  mlServiceProfileSchema,
+  type MlServiceHealth,
+  type MlServiceProfile,
+} from './ml-client.schemas.js';
 
 interface HttpResponse {
   ok: boolean;
@@ -10,7 +15,7 @@ interface HttpResponse {
 
 export type FetchImplementation = (
   input: string,
-  init: { headers: Record<string, string>; signal: AbortSignal },
+  init: { headers: Record<string, string>; signal: AbortSignal; method?: string; body?: FormData },
 ) => Promise<HttpResponse>;
 
 export class MlServiceError extends Error {
@@ -33,32 +38,54 @@ export class MlClientService {
   ) {}
 
   async health(): Promise<MlServiceHealth> {
+    const response = await this.request('/health');
+
+    if (!response.ok) {
+      throw new MlServiceError('upstream_error', `ML service health check failed with status ${response.status}.`);
+    }
+
+    const payload = await this.readJson(response, 'health');
+    const parsed = mlServiceHealthSchema.safeParse(payload);
+    if (!parsed.success) {
+      throw new MlServiceError('invalid_response', 'ML service returned an invalid health response.');
+    }
+
+    return parsed.data;
+  }
+
+  async profile(datasetId: string, csv: Buffer): Promise<MlServiceProfile> {
+    const body = new FormData();
+    body.set('dataset_id', datasetId);
+    body.set('file', new Blob([csv], { type: 'text/csv' }), `${datasetId}.csv`);
+
+    const response = await this.request('/v1/profile', {
+      method: 'POST',
+      body,
+    });
+
+    if (!response.ok) {
+      throw new MlServiceError('upstream_error', `ML service profiling failed with status ${response.status}.`);
+    }
+
+    const payload = await this.readJson(response, 'profile');
+    const parsed = mlServiceProfileSchema.safeParse(payload);
+    if (!parsed.success) {
+      throw new MlServiceError('invalid_response', 'ML service returned an invalid profile response.');
+    }
+
+    return parsed.data;
+  }
+
+  private async request(path: string, request: { method?: string; body?: FormData } = {}): Promise<HttpResponse> {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), this.config.timeoutMs);
 
     try {
-      const response = await this.fetchImplementation(`${this.config.baseUrl}/health`, {
+      return await this.fetchImplementation(`${this.config.baseUrl}${path}`, {
         headers: { authorization: `Bearer ${this.config.apiKey}` },
         signal: controller.signal,
+        ...request,
       });
-
-      if (!response.ok) {
-        throw new MlServiceError('upstream_error', `ML service health check failed with status ${response.status}.`);
-      }
-
-      let payload: unknown;
-      try {
-        payload = await response.json();
-      } catch {
-        throw new MlServiceError('invalid_response', 'ML service returned an invalid health response.');
-      }
-
-      const parsed = mlServiceHealthSchema.safeParse(payload);
-      if (!parsed.success) {
-        throw new MlServiceError('invalid_response', 'ML service returned an invalid health response.');
-      }
-
-      return parsed.data;
     } catch (error) {
       if (error instanceof MlServiceError) {
         throw error;
@@ -71,6 +98,14 @@ export class MlClientService {
       throw new MlServiceError('unavailable', 'ML service is unavailable.');
     } finally {
       clearTimeout(timeout);
+    }
+  }
+
+  private async readJson(response: HttpResponse, operation: 'health' | 'profile'): Promise<unknown> {
+    try {
+      return await response.json();
+    } catch {
+      throw new MlServiceError('invalid_response', `ML service returned an invalid ${operation} response.`);
     }
   }
 }

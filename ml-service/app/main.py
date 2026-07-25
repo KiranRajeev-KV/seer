@@ -2,10 +2,11 @@ from contextlib import asynccontextmanager
 from hmac import compare_digest
 from typing import AsyncIterator
 
-from fastapi import Depends, FastAPI, HTTPException, Request, status
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile, status
 from pydantic import BaseModel
 
 from .config import Settings
+from .profiling import ProfileFailure, ProfileResponse, profile_csv
 
 
 class HealthResponse(BaseModel):
@@ -36,6 +37,22 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/health", response_model=HealthResponse, dependencies=[Depends(require_api_key)])
     async def health() -> HealthResponse:
         return HealthResponse()
+
+    @app.post("/v1/profile", response_model=ProfileResponse, dependencies=[Depends(require_api_key)])
+    async def profile_dataset(
+        request: Request,
+        file: UploadFile = File(...),
+        dataset_id: str = Form(..., min_length=1),
+    ) -> ProfileResponse:
+        settings: Settings = request.app.state.settings
+        if file.content_type not in {"text/csv", "application/csv", "application/vnd.ms-excel"}:
+            raise HTTPException(status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="Expected a CSV file.")
+
+        raw_csv = await file.read(settings.max_csv_bytes + 1)
+        try:
+            return profile_csv(dataset_id, raw_csv, settings)
+        except ProfileFailure as error:
+            raise HTTPException(status_code=error.status_code, detail=error.detail) from error
 
     return app
 

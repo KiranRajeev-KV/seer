@@ -1,5 +1,30 @@
 {
   "version": "1.0.0",
-  "widgets": [],
-  "generatedAt": "2026-07-25T00:00:00.000Z"
+  "widgets": [
+    {
+      "uri": "/dataset-profile",
+      "name": "Dataset Profile",
+      "description": "Quality and structure profile for an approved Seer CSV dataset.",
+      "examples": [
+        {
+          "name": "Employee compensation",
+          "description": "Mixed-feature synthetic regression dataset profile.",
+          "data": {
+            "datasetId": "employee-compensation",
+            "dimensions": { "rows": 1500, "columns": 9 },
+            "duplicateRowCount": 0,
+            "targetCandidates": ["years_experience", "performance_rating", "certifications", "annual_salary"],
+            "identifierCandidates": ["employee_id"],
+            "constantColumns": [],
+            "unsupportedColumns": [],
+            "warnings": ["Some feature values are missing; a later analysis plan must disclose how they are handled."],
+            "columns": [],
+            "charts": { "missingValues": [], "numericDistributions": [], "categoryFrequencies": [] }
+          }
+        }
+      ],
+      "tags": ["dataset", "profile", "csv", "machine-learning"]
+    }
+  ],
+  "generatedAt": "2026-07-26T00:00:00.000Z"
 }

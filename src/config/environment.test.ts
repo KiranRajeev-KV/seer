@@ -11,7 +11,7 @@ test('loads a valid HTTPS ML-service configuration', () => {
   assert.deepEqual(config, {
     baseUrl: 'https://seer-ml.example.com',
     apiKey: 'test-secret',
-    timeoutMs: 10_000,
+    timeoutMs: 120_000,
   });
 });
 
