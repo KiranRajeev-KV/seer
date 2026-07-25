@@ -55,7 +55,7 @@
       "tags": ["analysis", "machine-learning", "approval"]
     },
     {
-      "uri": "/analysis-results",
+      "uri": "/next-analysis-results",
       "name": "Analysis Results",
       "description": "Transparent regression or classification evaluation, predictions, diagnostics, and limitations.",
       "examples": [

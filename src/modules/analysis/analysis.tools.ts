@@ -59,7 +59,7 @@ export class AnalysisTools {
     taskSupport: 'optional',
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   })
-  @Widget('analysis-results')
+  @Widget('next-analysis-results')
   async runAnalysis(input: z.infer<typeof runAnalysisInputSchema>, context: ExecutionContext) {
     try {
       context.task?.updateProgress('Validating dataset');
