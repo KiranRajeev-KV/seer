@@ -1,9 +1,9 @@
 {
   "name": "seer",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "My awesome MCP server",
+  "description": "Seer MCP server for transparent CSV-based predictive analysis",
   "scripts": {
     "dev": "nitrostack-cli dev",
     "build": "nitrostack-cli build",
@@ -11,16 +11,17 @@
     "start:prod": "nitrostack-cli start",
     "upgrade": "nitrostack-cli upgrade",
     "install:all": "nitrostack-cli install",
-    "widget": "npm --prefix src/widgets"
+    "widget": "npm --prefix src/widgets",
+    "test:unit": "npm run build && node --test dist/config/environment.test.js dist/modules/ml-client/ml-client.service.test.js"
   },
   "dependencies": {
     "dotenv": "^16.3.1",
-    "@nitrostack/core": "^1",
+    "@nitrostack/core": "^1.0.14",
     "zod": "^3.22.4",
     "@modelcontextprotocol/ext-apps": ">=0.1.0"
   },
   "devDependencies": {
-    "@nitrostack/cli": "^1",
+    "@nitrostack/cli": "^1.0.15",
     "@types/node": "^22.10.0",
     "typescript": "^5.3.3"
   },

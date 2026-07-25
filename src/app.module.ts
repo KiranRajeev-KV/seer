@@ -1,18 +1,15 @@
 import { McpApp, Module, ConfigModule } from '@nitrostack/core';
-import { CalculatorModule } from './modules/calculator/calculator.module.js';
 import { SystemHealthCheck } from './health/system.health.js';
+import { MlClientModule } from './modules/ml-client/ml-client.module.js';
 
 /**
- * Root Application Module
- * 
- * This is the main module that bootstraps the MCP server.
- * It registers all feature modules and health checks.
+ * Root module for the Seer MCP server.
  */
 @McpApp({
   module: AppModule,
   server: {
-    name: 'calculator-server',
-    version: '1.0.0'
+    name: 'seer',
+    version: '0.1.0'
   },
   logging: {
     level: 'info'
@@ -23,12 +20,10 @@ import { SystemHealthCheck } from './health/system.health.js';
   description: 'Root application module',
   imports: [
     ConfigModule.forRoot(),
-    CalculatorModule
+    MlClientModule
   ],
   providers: [
-    // Health Checks
     SystemHealthCheck,
   ]
 })
 export class AppModule {}
-

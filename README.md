@@ -1,49 +1,46 @@
-# NitroStack Starter Template
+# Seer
 
-Minimal template for learning NitroStack fundamentals with a calculator-focused
-MCP server and basic widgets.
+Seer is an MCP application for transparent, CSV-based predictive analysis.
+It will help non-technical users profile approved datasets, approve a
+supervised-learning plan, and understand the resulting estimate or
+classification.
 
-## What This Template Includes
+## Phase 0: deployment spike
 
-- `calculator` module with tools, resources, and prompts
-- TypeScript + Zod validation setup
-- Widget-ready project structure
-- Production-friendly npm scripts
+This phase contains one MCP tool, `python_health`. It verifies that the
+NitroStack server can call the independently deployed FastAPI ML service.
 
-## Quick Start
+### Local setup
 
-```bash
-npx @nitrostack/cli init my-server --template typescript-starter
-cd my-server
-npm run dev
+1. Copy `.env.example` to `.env` and set a long shared `ML_SERVICE_API_KEY`.
+2. In another terminal, install and start the ML service:
+
+   ```bash
+   cd ml-service
+   python -m venv .venv
+   .venv/bin/pip install -e ".[dev]"
+   ML_SERVICE_API_KEY=your-secret .venv/bin/uvicorn app.main:app --port 8080
+   ```
+
+3. Install Node dependencies and run the MCP server:
+
+   ```bash
+   npm install
+   npm run dev
+   ```
+
+Run the TypeScript unit tests with `npm run test:unit`, and the Python tests
+with `cd ml-service && python -m pytest`.
+
+### Deployment contract
+
+Deploy `ml-service/` independently to Cloud Run in `asia-south1` and configure
+the same `ML_SERVICE_API_KEY` as a Cloud Run secret and NitroCloud environment
+variable. The Cloud Run endpoint may allow unauthenticated invocation because
+the application requires the bearer secret for every request. Configure the
+deployed NitroCloud server with the Cloud Run HTTPS URL, then invoke
+`python_health`; a successful response is:
+
+```json
+{"status":"healthy","service":"seer-ml","version":"0.1.0"}
 ```
-
-## Common Commands
-
-```bash
-npm run dev
-npm run build
-npm start
-```
-
-## NitroStudio
-
-NitroStudio is the recommended way to test and debug this template during
-development.
-
-- Download: <https://nitrostack.ai/studio>
-- Studio: <https://nitrostack.ai/studio>
-
-## Links
-
-- Docs: <https://docs.nitrostack.ai>
-- Templates docs: <https://docs.nitrostack.ai/templates/01-starter-template>
-- Main repository: <https://github.com/nitrocloudofficial/nitrostack>
-
-## Community
-
-- Discord: <https://discord.gg/uVWey6UhuD>
-- X: <https://x.com/nitrostackai>
-- YouTube: <https://www.youtube.com/@nitrostackai>
-- LinkedIn: <https://linkedin.com/company/nitrostack-ai/>
-- GitHub: <https://github.com/nitrostackai>

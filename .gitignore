@@ -45,6 +45,12 @@ uploads/
 # TypeScript cache
 *.tsbuildinfo
 
+# Python service
+ml-service/.venv/
+ml-service/.pytest_cache/
+ml-service/**/__pycache__/
+*.pyc
+
 # Optional npm cache
 .npm/
 
