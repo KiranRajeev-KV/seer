@@ -10,7 +10,7 @@ const config: MlServiceConfig = {
 };
 
 function makeClient(fetchImplementation: FetchImplementation): MlClientService {
-  return new MlClientService(config, fetchImplementation);
+  return MlClientService.forTesting(config, fetchImplementation);
 }
 
 test('returns a valid ML-service health response', async () => {

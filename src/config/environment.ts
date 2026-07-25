@@ -12,6 +12,15 @@ export interface MlServiceConfig {
   timeoutMs: number;
 }
 
+const analysisPlanEnvironmentSchema = z.object({
+  ANALYSIS_PLAN_TOKEN_SECRET: z.string().min(32),
+});
+
+export interface AnalysisPlanConfig {
+  tokenSecret: string;
+  tokenLifetimeMs: number;
+}
+
 export function loadMlServiceConfig(environment: NodeJS.ProcessEnv = process.env): MlServiceConfig {
   const parsed = environmentSchema.parse(environment);
   const url = new URL(parsed.ML_SERVICE_BASE_URL);
@@ -25,5 +34,14 @@ export function loadMlServiceConfig(environment: NodeJS.ProcessEnv = process.env
     baseUrl: url.toString().replace(/\/$/, ''),
     apiKey: parsed.ML_SERVICE_API_KEY,
     timeoutMs: parsed.ML_SERVICE_TIMEOUT_MS,
+  };
+}
+
+export function loadAnalysisPlanConfig(environment: NodeJS.ProcessEnv = process.env): AnalysisPlanConfig {
+  const parsed = analysisPlanEnvironmentSchema.parse(environment);
+
+  return {
+    tokenSecret: parsed.ANALYSIS_PLAN_TOKEN_SECRET,
+    tokenLifetimeMs: 15 * 60 * 1000,
   };
 }

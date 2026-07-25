@@ -24,6 +24,35 @@
         }
       ],
       "tags": ["dataset", "profile", "csv", "machine-learning"]
+    },
+    {
+      "uri": "/analysis-plan",
+      "name": "Analysis Plan Approval",
+      "description": "Review and approve a validated Seer analysis plan before execution.",
+      "examples": [
+        {
+          "name": "Employee compensation regression",
+          "description": "A linear-regression plan awaiting user approval.",
+          "data": {
+            "planToken": "example-plan-token",
+            "plan": {
+              "datasetId": "employee-compensation",
+              "question": "What salary is estimated for a developer with ten years of experience?",
+              "targetColumn": "annual_salary",
+              "featureColumns": ["years_experience", "education_level", "department", "location", "performance_rating", "certifications", "remote_status"],
+              "taskType": "regression",
+              "predictionRows": [{"years_experience": 10, "education_level": "master", "department": "engineering", "location": "bengaluru", "performance_rating": 4, "certifications": 2, "remote_status": "hybrid"}],
+              "preprocessing": {"numeric": ["years_experience", "performance_rating", "certifications"], "categorical": ["education_level", "department", "location", "remote_status"]},
+              "rows": {"dataset": 1500, "missingTarget": 0, "usable": 1500},
+              "excludedColumns": [{"name": "employee_id", "reason": "Identifier-like columns are excluded from model features."}],
+              "assumptions": ["Numeric feature 'performance_rating' has a small number of distinct values and will be treated as continuous."],
+              "warnings": [],
+              "split": {"trainingPercent": 80, "testPercent": 20, "randomState": 42}
+            }
+          }
+        }
+      ],
+      "tags": ["analysis", "machine-learning", "approval"]
     }
   ],
   "generatedAt": "2026-07-26T00:00:00.000Z"

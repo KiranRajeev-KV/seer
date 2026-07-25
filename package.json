@@ -12,7 +12,7 @@
     "upgrade": "nitrostack-cli upgrade",
     "install:all": "nitrostack-cli install",
     "widget": "npm --prefix src/widgets",
-    "test:unit": "npm run build && node --test dist/config/environment.test.js dist/modules/ml-client/ml-client.service.test.js dist/modules/datasets/datasets.service.test.js dist/modules/datasets/datasets.resources.test.js dist/modules/datasets/datasets.tools.test.js"
+    "test:unit": "npm run build && node --test dist/config/environment.test.js dist/modules/ml-client/ml-client.service.test.js dist/modules/datasets/datasets.service.test.js dist/modules/datasets/datasets.resources.test.js dist/modules/datasets/datasets.tools.test.js dist/modules/analysis/analysis.service.test.js dist/modules/analysis/plan-token.service.test.js dist/modules/analysis/analysis.tools.test.js"
   },
   "dependencies": {
     "dotenv": "^16.3.1",

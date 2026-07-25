@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loadMlServiceConfig } from './environment.js';
+import { loadAnalysisPlanConfig, loadMlServiceConfig } from './environment.js';
 
 test('loads a valid HTTPS ML-service configuration', () => {
   const config = loadMlServiceConfig({
@@ -32,4 +32,17 @@ test('rejects non-local HTTP ML-service URLs', () => {
     }),
     /HTTPS/,
   );
+});
+
+test('loads the dedicated analysis-plan token configuration', () => {
+  assert.deepEqual(loadAnalysisPlanConfig({
+    ANALYSIS_PLAN_TOKEN_SECRET: 'a-very-long-dedicated-plan-token-secret',
+  }), {
+    tokenSecret: 'a-very-long-dedicated-plan-token-secret',
+    tokenLifetimeMs: 900_000,
+  });
+});
+
+test('rejects a missing or short analysis-plan token secret', () => {
+  assert.throws(() => loadAnalysisPlanConfig({ ANALYSIS_PLAN_TOKEN_SECRET: 'too-short' }));
 });

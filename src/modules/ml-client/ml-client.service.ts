@@ -32,10 +32,20 @@ const defaultFetch: FetchImplementation = (input, init) => fetch(input, init);
 
 @Injectable({ deps: [] })
 export class MlClientService {
-  constructor(
-    private readonly config: MlServiceConfig = loadMlServiceConfig(),
-    private readonly fetchImplementation: FetchImplementation = defaultFetch,
-  ) {}
+  private config: MlServiceConfig;
+  private fetchImplementation: FetchImplementation;
+
+  constructor() {
+    this.config = loadMlServiceConfig();
+    this.fetchImplementation = defaultFetch;
+  }
+
+  static forTesting(config: MlServiceConfig, fetchImplementation: FetchImplementation = defaultFetch): MlClientService {
+    const service = Object.create(MlClientService.prototype) as MlClientService;
+    service.config = config;
+    service.fetchImplementation = fetchImplementation;
+    return service;
+  }
 
   async health(): Promise<MlServiceHealth> {
     const response = await this.request('/health');
