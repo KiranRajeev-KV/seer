@@ -161,6 +161,29 @@ def test_classification_rejects_a_class_without_enough_rows() -> None:
         analyze_classification_csv(csv, make_classification_plan(), settings())
 
 
+def test_classification_discloses_material_class_imbalance() -> None:
+    rows = ["tenure_years,monthly_hours,department,attrition"]
+    rows.extend(f"{index % 5 + 1},{218 + index % 18},sales,leave" for index in range(30))
+    rows.extend(f"{index % 8 + 5},{165 + index % 22},engineering,stay" for index in range(5))
+
+    result = analyze_classification_csv("\n".join(rows).encode(), make_classification_plan(), settings())
+
+    assert any("below the 20.0% imbalance threshold" in warning for warning in result.warnings)
+
+
+def test_analysis_enforces_configured_prediction_row_limit() -> None:
+    configured_settings = Settings(api_key="test-secret", max_prediction_rows=1)
+    with pytest.raises(AnalysisFailure, match="maximum of 1 prediction row"):
+        analyze_regression_csv(
+            regression_csv(),
+            make_plan([
+                {"years_experience": 10, "department": "engineering"},
+                {"years_experience": 11, "department": "sales"},
+            ]),
+            configured_settings,
+        )
+
+
 def test_classification_endpoint_accepts_the_full_signed_plan_shape() -> None:
     full_plan = make_classification_plan().model_dump()
     full_plan.update({

@@ -71,7 +71,7 @@ export class AnalysisTools {
       context.task?.throwIfCancelled();
       context.task?.updateProgress('Fitting preprocessing pipeline');
       context.task?.updateProgress('Training model');
-      const result = await this.mlClient.analyze(approved.plan, approved.csv);
+      const result = await this.mlClient.analyze(approved.plan, approved.csv, context.requestId);
       context.task?.throwIfCancelled();
       context.task?.updateProgress('Training baseline');
       context.task?.updateProgress('Evaluating models');

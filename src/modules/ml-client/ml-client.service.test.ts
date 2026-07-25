@@ -7,6 +7,7 @@ const config: MlServiceConfig = {
   baseUrl: 'https://seer-ml.example.com',
   apiKey: 'test-secret',
   timeoutMs: 25,
+  maxRetries: 1,
 };
 
 function makeClient(fetchImplementation: FetchImplementation): MlClientService {
@@ -16,35 +17,61 @@ function makeClient(fetchImplementation: FetchImplementation): MlClientService {
 test('returns a valid ML-service health response', async () => {
   let requestUrl = '';
   let authorization = '';
+  let requestId = '';
   const client = makeClient(async (input, init) => {
     requestUrl = input;
     authorization = init.headers.authorization;
+    requestId = init.headers['x-request-id'] ?? '';
     return new Response(JSON.stringify({ status: 'healthy', service: 'seer-ml', version: '0.1.0' }), { status: 200 });
   });
 
-  const result = await client.health();
+  const result = await client.health('mcp-request-42');
 
   assert.equal(requestUrl, 'https://seer-ml.example.com/health');
   assert.equal(authorization, 'Bearer test-secret');
+  assert.equal(requestId, 'mcp-request-42');
   assert.deepEqual(result, { status: 'healthy', service: 'seer-ml', version: '0.1.0' });
 });
 
 test('normalizes timeouts', async () => {
+  let attempts = 0;
   const client = makeClient(async () => {
+    attempts += 1;
     const error = new Error('aborted');
     error.name = 'AbortError';
     throw error;
   });
 
   await assert.rejects(client.health(), (error: unknown) => error instanceof MlServiceError && error.code === 'timeout');
+  assert.equal(attempts, 1);
 });
 
-test('normalizes upstream HTTP errors without exposing a response body', async () => {
-  const client = makeClient(async () => new Response('sensitive details', { status: 503 }));
+test('retries one transient upstream failure without exposing its response body', async () => {
+  let attempts = 0;
+  const delays: number[] = [];
+  const client = MlClientService.forTesting(config, async () => {
+    attempts += 1;
+    return new Response('sensitive details', { status: 503 });
+  }, async (milliseconds) => { delays.push(milliseconds); });
 
   await assert.rejects(client.health(), (error: unknown) => error instanceof MlServiceError
     && error.code === 'upstream_error'
-    && error.message === 'ML service health check failed with status 503.');
+    && error.message === 'ML service health is temporarily unavailable.');
+  assert.equal(attempts, 2);
+  assert.deepEqual(delays, [250]);
+});
+
+test('does not retry client validation errors and returns their safe detail', async () => {
+  let attempts = 0;
+  const client = makeClient(async () => {
+    attempts += 1;
+    return new Response(JSON.stringify({ detail: 'CSV exceeds the configured row limit.' }), { status: 422 });
+  });
+
+  await assert.rejects(client.health(), (error: unknown) => error instanceof MlServiceError
+    && error.code === 'validation_error'
+    && error.message === 'CSV exceeds the configured row limit.');
+  assert.equal(attempts, 1);
 });
 
 test('rejects malformed health responses', async () => {

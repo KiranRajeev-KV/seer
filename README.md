@@ -5,7 +5,7 @@ It helps non-technical users profile approved datasets, create and approve a
 supervised-learning plan, and understand the resulting estimate or
 classification.
 
-## Phase 4: approved regression and classification analysis
+## Phase 5: hardened regression and classification analysis
 
 Seer includes approved synthetic employee-compensation regression and
 employee-attrition classification datasets. The MCP server exposes their
@@ -53,9 +53,9 @@ Run the TypeScript unit tests with `npm run test:unit`, build widgets with
 `npm --prefix src/widgets run build`, and run Python tests with
 `cd ml-service && uv run --extra dev pytest`.
 
-### Profiling limits
+### Limits and reliability
 
-The ML service rejects CSVs above these configurable limits before profiling:
+The MCP server and ML service enforce these configurable limits before training:
 
 | Environment variable | Default |
 | --- | ---: |
@@ -64,11 +64,25 @@ The ML service rejects CSVs above these configurable limits before profiling:
 | `ML_PROFILE_MAX_CSV_COLUMNS` | 50 |
 | `ML_PROFILE_MAX_CATEGORICAL_VALUES` | 50 |
 | `ML_PROFILE_SAMPLE_ROWS` | 10 |
+| `ML_MAX_ENCODED_FEATURES` | 500 |
+| `ML_MAX_PREDICTION_ROWS` | 10 |
+| `ML_MIN_USABLE_ROWS` | 20 |
+| `ML_MAX_CLASSIFICATION_CLASSES` | 10 |
+| `ML_CLASS_IMBALANCE_THRESHOLD_PERCENT` | 20% |
 
-`ML_SERVICE_TIMEOUT_MS` defaults to 120,000 milliseconds for profile and
-analysis requests. `run_analysis` supports optional MCP Tasks: ordinary calls
-return synchronously, while task-capable clients receive progress updates and
-can cancel before the ML-service call completes.
+`ML_SERVICE_TIMEOUT_MS` defaults to 120,000 milliseconds for each ML-service
+attempt. `ML_SERVICE_MAX_RETRIES` defaults to one retry after 250 ms for a
+connection failure or 5xx response; timeouts, cancellations, authentication,
+validation, and malformed responses are never retried. Every MCP request ID is
+forwarded as `X-Request-ID`, echoed by the ML service, and used in safe
+operational logs. The service never logs CSV contents or prediction inputs.
+
+Prediction rows outside the observed numeric dataset range are disclosed in
+the approval plan and checked again against the training range in the final
+result. Classification results warn when the least frequent usable class is
+below the configured 20% threshold. `run_analysis` supports optional MCP
+Tasks: ordinary calls return synchronously, while task-capable clients receive
+progress updates and can cancel before the ML-service call completes.
 
 ### Deployment contract
 

@@ -228,12 +228,12 @@ def analyze_csv(raw_csv: bytes, plan: AnalysisPlan, settings: Settings) -> Analy
 
 def analyze_regression_csv(raw_csv: bytes, plan: RegressionAnalysisPlan, settings: Settings) -> RegressionAnalysisResponse:
     dataframe = _read_and_validate_csv(raw_csv, settings)
-    _validate_plan_against_dataframe(plan, dataframe, numeric_target=True)
+    _validate_plan_against_dataframe(plan, dataframe, settings, numeric_target=True)
 
     target = pd.to_numeric(dataframe[plan.targetColumn], errors="raise").astype(float)
     usable, usable_target = _usable_rows(dataframe, target)
-    if len(usable) < 20:
-        raise AnalysisFailure(422, "At least 20 rows with a target value are required for regression.")
+    if len(usable) < settings.min_usable_rows:
+        raise AnalysisFailure(422, f"At least {settings.min_usable_rows} rows with a target value are required for regression.")
     if usable_target.nunique() < 5:
         raise AnalysisFailure(422, "Regression requires a target with at least five distinct values.")
 
@@ -282,15 +282,15 @@ def analyze_regression_csv(raw_csv: bytes, plan: RegressionAnalysisPlan, setting
 
 def analyze_classification_csv(raw_csv: bytes, plan: ClassificationAnalysisPlan, settings: Settings) -> ClassificationAnalysisResponse:
     dataframe = _read_and_validate_csv(raw_csv, settings)
-    _validate_plan_against_dataframe(plan, dataframe, numeric_target=False)
+    _validate_plan_against_dataframe(plan, dataframe, settings, numeric_target=False)
     target = dataframe[plan.targetColumn].astype("string")
     usable, usable_target = _usable_rows(dataframe, target)
     labels = sorted(str(label) for label in usable_target.unique())
     class_counts = usable_target.value_counts()
-    if len(usable) < 20:
-        raise AnalysisFailure(422, "At least 20 rows with a target value are required for classification.")
-    if not 2 <= len(labels) <= 10:
-        raise AnalysisFailure(422, "Classification requires a target with between 2 and 10 classes.")
+    if len(usable) < settings.min_usable_rows:
+        raise AnalysisFailure(422, f"At least {settings.min_usable_rows} rows with a target value are required for classification.")
+    if not 2 <= len(labels) <= settings.max_classification_classes:
+        raise AnalysisFailure(422, f"Classification requires a target with between 2 and {settings.max_classification_classes} classes.")
     if (class_counts < 2).any():
         raise AnalysisFailure(422, "Each classification target class needs at least two usable rows.")
 
@@ -345,6 +345,7 @@ def analyze_classification_csv(raw_csv: bytes, plan: ClassificationAnalysisPlan,
         *plan.warnings,
         *_prediction_warnings(predictions),
         *_classification_quality_warnings(quality),
+        *_classification_imbalance_warnings(distribution, settings.class_imbalance_threshold_percent),
         "Classifications are estimates based on historical dataset patterns; they are not guarantees.",
     ]))
     return ClassificationAnalysisResponse(
@@ -383,7 +384,7 @@ def _read_and_validate_csv(raw_csv: bytes, settings: Settings) -> pd.DataFrame:
     return dataframe
 
 
-def _validate_plan_against_dataframe(plan: BaseAnalysisPlan, dataframe: pd.DataFrame, *, numeric_target: bool) -> None:
+def _validate_plan_against_dataframe(plan: BaseAnalysisPlan, dataframe: pd.DataFrame, settings: Settings, *, numeric_target: bool) -> None:
     columns = set(dataframe.columns.astype(str))
     if plan.targetColumn not in columns:
         raise AnalysisFailure(422, "The analysis target is not present in this CSV.")
@@ -396,6 +397,17 @@ def _validate_plan_against_dataframe(plan: BaseAnalysisPlan, dataframe: pd.DataF
         raise AnalysisFailure(422, "The analysis preprocessing does not match the selected features.")
     if any(set(row) != set(plan.featureColumns) for row in plan.predictionRows):
         raise AnalysisFailure(422, "Prediction inputs do not match the selected features.")
+    if len(plan.predictionRows) > settings.max_prediction_rows:
+        raise AnalysisFailure(422, f"A maximum of {settings.max_prediction_rows} prediction row(s) can be analysed at once.")
+    usable_dataframe = dataframe.loc[dataframe[plan.targetColumn].notna()]
+    categorical_feature_count = 0
+    for name in plan.preprocessing.categorical:
+        category_count = usable_dataframe[name].dropna().astype(str).nunique()
+        categorical_feature_count += category_count
+        if category_count > settings.max_categorical_values:
+            raise AnalysisFailure(422, f"Feature column '{name}' exceeds the {settings.max_categorical_values}-category limit.")
+    if len(plan.preprocessing.numeric) + categorical_feature_count > settings.max_encoded_features:
+        raise AnalysisFailure(422, f"Selected features would create more than {settings.max_encoded_features} encoded features.")
     try:
         if numeric_target:
             pd.to_numeric(dataframe[plan.targetColumn].dropna(), errors="raise")
@@ -515,4 +527,13 @@ def _regression_quality_warnings(quality: str, metrics: RegressionMetricValues) 
 def _classification_quality_warnings(quality: str) -> list[str]:
     if quality == "no_demonstrated_signal":
         return ["The model did not outperform the most-frequent-class baseline on weighted F1."]
+    return []
+
+
+def _classification_imbalance_warnings(distribution: list[ClassDistribution], threshold_percent: float) -> list[str]:
+    minority = min(distribution, key=lambda item: item.percentage)
+    if minority.percentage < threshold_percent:
+        return [
+            f"Class '{minority.classLabel}' represents {minority.percentage:.1f}% of usable rows, below the {threshold_percent:.1f}% imbalance threshold."
+        ]
     return []

@@ -50,6 +50,17 @@ def test_profile_rejects_missing_or_invalid_api_keys() -> None:
     assert response.json() == {"detail": "Unauthorized"}
 
 
+def test_service_echoes_a_valid_request_id() -> None:
+    with make_client() as client:
+        response = client.get(
+            "/health",
+            headers={"Authorization": "Bearer test-secret", "X-Request-ID": "mcp-request-42"},
+        )
+
+    assert response.status_code == 200
+    assert response.headers["x-request-id"] == "mcp-request-42"
+
+
 def test_profile_rejects_duplicate_headers_and_empty_csv() -> None:
     with make_client() as client:
         duplicate = profile(client, "name,name\na,b\n")

@@ -17,10 +17,10 @@ export class MlClientTools {
   })
   async pythonHealth(_input: Record<string, never>, context: ExecutionContext) {
     try {
-      return await this.mlClient.health();
+      return await this.mlClient.health(context.requestId);
     } catch (error) {
       const code = error instanceof MlServiceError ? error.code : 'unknown';
-      context.logger.error('ML service health check failed', { code });
+      context.logger.error('ML service health check failed', { code, requestId: context.requestId });
       throw error;
     }
   }

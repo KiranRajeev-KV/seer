@@ -1,5 +1,6 @@
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { Injectable } from '@nitrostack/core';
+import { loadAnalysisLimits, type AnalysisLimits } from '../../config/environment.js';
 import { DatasetsService } from '../datasets/datasets.service.js';
 import {
   type AnalysisPlan,
@@ -9,10 +10,6 @@ import {
   type TaskType,
 } from './analysis.schemas.js';
 import { PlanTokenService } from './plan-token.service.js';
-
-const MAX_CATEGORICAL_VALUES = 50;
-const MAX_ENCODED_FEATURES = 500;
-const MIN_USABLE_ROWS = 20;
 
 type Cell = string | undefined;
 type ColumnKind = 'numeric' | 'categorical' | 'datetime' | 'text' | 'empty';
@@ -27,6 +24,7 @@ interface ColumnInspection {
   kind: ColumnKind;
   uniqueValues: string[];
   missingCount: number;
+  numericRange?: { min: number; max: number };
   isIdentifier: boolean;
   isConstant: boolean;
 }
@@ -43,6 +41,7 @@ export class AnalysisService {
   constructor(
     private readonly datasets: DatasetsService,
     private readonly tokenService: PlanTokenService,
+    private readonly limits: AnalysisLimits = loadAnalysisLimits(),
   ) {}
 
   async create(input: CreateAnalysisPlanInput): Promise<CreateAnalysisPlanResponse> {
@@ -77,6 +76,9 @@ export class AnalysisService {
   }
 
   private validatePlan(table: CsvTable, input: CreateAnalysisPlanInput): AnalysisPlan {
+    if (input.predictionRows.length > this.limits.maxPredictionRows) {
+      throw new AnalysisPlanError(`A maximum of ${this.limits.maxPredictionRows} prediction row(s) can be analysed at once.`);
+    }
     if (!table.headers.includes(input.targetColumn)) {
       throw new AnalysisPlanError(`Target column '${input.targetColumn}' does not exist in this dataset.`);
     }
@@ -91,16 +93,16 @@ export class AnalysisService {
 
     const rowsWithTarget = table.rows.filter((row) => !isMissing(row[input.targetColumn]));
     const missingTarget = table.rows.length - rowsWithTarget.length;
-    if (rowsWithTarget.length < MIN_USABLE_ROWS) {
-      throw new AnalysisPlanError(`At least ${MIN_USABLE_ROWS} rows with a target value are required.`);
+    if (rowsWithTarget.length < this.limits.minUsableRows) {
+      throw new AnalysisPlanError(`At least ${this.limits.minUsableRows} rows with a target value are required.`);
     }
 
-    const target = inspectColumn(input.targetColumn, rowsWithTarget.map((row) => row[input.targetColumn]), rowsWithTarget.length);
+    const target = inspectColumn(input.targetColumn, rowsWithTarget.map((row) => row[input.targetColumn]), rowsWithTarget.length, this.limits.maxCategoricalValues);
     this.validateTarget(target, input.taskType, rowsWithTarget);
 
     const inspections = new Map<string, ColumnInspection>();
     for (const header of table.headers) {
-      inspections.set(header, inspectColumn(header, rowsWithTarget.map((row) => row[header]), rowsWithTarget.length));
+      inspections.set(header, inspectColumn(header, rowsWithTarget.map((row) => row[header]), rowsWithTarget.length, this.limits.maxCategoricalValues));
     }
 
     const numericFeatures: string[] = [];
@@ -125,15 +127,15 @@ export class AnalysisService {
           assumptions.push(`Numeric feature '${feature}' has a small number of distinct values and will be treated as continuous.`);
         }
       } else {
-        if (inspection.uniqueValues.length > MAX_CATEGORICAL_VALUES) {
-          throw new AnalysisPlanError(`Feature column '${feature}' exceeds the ${MAX_CATEGORICAL_VALUES}-category limit.`);
+        if (inspection.uniqueValues.length > this.limits.maxCategoricalValues) {
+          throw new AnalysisPlanError(`Feature column '${feature}' exceeds the ${this.limits.maxCategoricalValues}-category limit.`);
         }
         categoricalFeatures.push(feature);
         encodedFeatures += inspection.uniqueValues.length;
       }
     }
-    if (encodedFeatures > MAX_ENCODED_FEATURES) {
-      throw new AnalysisPlanError(`Selected features would create ${encodedFeatures} encoded features, above the ${MAX_ENCODED_FEATURES} limit.`);
+    if (encodedFeatures > this.limits.maxEncodedFeatures) {
+      throw new AnalysisPlanError(`Selected features would create ${encodedFeatures} encoded features, above the ${this.limits.maxEncodedFeatures} limit.`);
     }
 
     const predictionWarnings = this.validatePredictionRows(input.predictionRows, input.featureColumns, inspections);
@@ -189,8 +191,8 @@ export class AnalysisService {
       const value = row[target.name]!;
       classCounts.set(value, (classCounts.get(value) ?? 0) + 1);
     }
-    if (classCounts.size < 2 || classCounts.size > 10) {
-      throw new AnalysisPlanError('Classification requires a target with between 2 and 10 classes.');
+    if (classCounts.size < 2 || classCounts.size > this.limits.maxClassificationClasses) {
+      throw new AnalysisPlanError(`Classification requires a target with between 2 and ${this.limits.maxClassificationClasses} classes.`);
     }
     if ([...classCounts.values()].some((count) => count < 2)) {
       throw new AnalysisPlanError('Each classification target class needs at least two usable rows.');
@@ -220,6 +222,9 @@ export class AnalysisService {
         const inspection = inspections.get(feature)!;
         if (inspection.kind === 'numeric' && (typeof value === 'boolean' || !Number.isFinite(Number(value)))) {
           throw new AnalysisPlanError(`Prediction row ${index + 1} must provide a numeric value for '${feature}'.`);
+        }
+        if (inspection.kind === 'numeric' && inspection.numericRange && (Number(value) < inspection.numericRange.min || Number(value) > inspection.numericRange.max)) {
+          warnings.push(`Prediction row ${index + 1} is outside the observed dataset range for '${feature}'; the final result will disclose its training-range coverage.`);
         }
         if (inspection.kind === 'categorical' && !inspection.uniqueValues.includes(String(value))) {
           warnings.push(`Prediction row ${index + 1} contains an unseen category for '${feature}'; the model will ignore that category during one-hot encoding.`);
@@ -310,25 +315,26 @@ function parseCsv(content: string): CsvTable {
   };
 }
 
-function inspectColumn(name: string, values: Cell[], rowCount: number): ColumnInspection {
+function inspectColumn(name: string, values: Cell[], rowCount: number, maxCategoricalValues: number): ColumnInspection {
   const present = values.filter((value): value is string => !isMissing(value));
   const uniqueValues = [...new Set(present)];
-  const kind = inferColumnKind(present, uniqueValues.length);
+  const kind = inferColumnKind(present, uniqueValues.length, maxCategoricalValues);
   return {
     name,
     kind,
     uniqueValues,
     missingCount: values.length - present.length,
+    numericRange: kind === 'numeric' ? { min: Math.min(...present.map(Number)), max: Math.max(...present.map(Number)) } : undefined,
     isIdentifier: isIdentifier(name, kind, present.length, uniqueValues.length, rowCount),
     isConstant: uniqueValues.length <= 1,
   };
 }
 
-function inferColumnKind(values: string[], uniqueCount: number): ColumnKind {
+function inferColumnKind(values: string[], uniqueCount: number, maxCategoricalValues: number): ColumnKind {
   if (!values.length) return 'empty';
   if (values.every((value) => Number.isFinite(Number(value)))) return 'numeric';
   if (values.every((value) => isDateLike(value))) return 'datetime';
-  return uniqueCount <= MAX_CATEGORICAL_VALUES ? 'categorical' : 'text';
+  return uniqueCount <= maxCategoricalValues ? 'categorical' : 'text';
 }
 
 function isIdentifier(name: string, kind: ColumnKind, nonMissing: number, unique: number, rows: number): boolean {

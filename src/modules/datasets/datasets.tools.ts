@@ -29,7 +29,7 @@ export class DatasetsTools {
   async profileDataset(input: z.infer<typeof profileDatasetInputSchema>, context: ExecutionContext) {
     try {
       const csv = await this.datasets.readCsv(input.datasetId);
-      const profile = await this.mlClient.profile(input.datasetId, csv);
+      const profile = await this.mlClient.profile(input.datasetId, csv, context.requestId);
       context.logger.info('Dataset profiled', {
         datasetId: input.datasetId,
         rows: profile.dimensions.rows,

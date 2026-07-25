@@ -1,16 +1,18 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import type { AnalysisLimits } from '../../config/environment.js';
 import { AnalysisPlanError, AnalysisService } from './analysis.service.js';
 import { PlanTokenService } from './plan-token.service.js';
 
 const regressionCsv = Buffer.from(`employee_id,years_experience,department,performance_rating,annual_salary\n${Array.from({ length: 24 }, (_, index) => `EMP${String(index + 1).padStart(4, '0')},${index + 1},${index % 2 ? 'engineering' : 'sales'},${(index % 5) + 1},${70000 + index * 3000}`).join('\n')}\n`);
 const classificationCsv = Buffer.from(`id,years_experience,department,churn\n${Array.from({ length: 24 }, (_, index) => `EMP${String(index + 1).padStart(4, '0')},${index + 1},${index % 2 ? 'engineering' : 'sales'},${index % 2 ? 'yes' : 'no'}`).join('\n')}\n`);
 
-function createService(initialCsv: Buffer<ArrayBufferLike> = regressionCsv) {
+function createService(initialCsv: Buffer<ArrayBufferLike> = regressionCsv, limits?: AnalysisLimits) {
   let csv: Buffer<ArrayBufferLike> = initialCsv;
   const service = new AnalysisService(
     { readCsv: async () => csv } as never,
     PlanTokenService.forTesting({ tokenSecret: 'a-very-long-dedicated-plan-token-secret', tokenLifetimeMs: 900_000 }, () => 1_000),
+    limits,
   );
   return { service, replaceCsv: (value: Buffer<ArrayBufferLike>) => { csv = value; } };
 }
@@ -80,4 +82,30 @@ test('rejects confirmation when the packaged dataset changes', async () => {
   replaceCsv(Buffer.from(`${regressionCsv.toString('utf8')}EMP9999,25,sales,4,150000\n`));
 
   await assert.rejects(service.confirm(result.planToken), /dataset has changed/);
+});
+
+test('discloses prediction rows outside the observed numeric dataset range before approval', async () => {
+  const { service } = createService();
+  const result = await service.create({
+    datasetId: 'employee-compensation', question: 'Estimate salary', targetColumn: 'annual_salary',
+    featureColumns: ['years_experience'], taskType: 'regression', predictionRows: [{ years_experience: 99 }],
+  });
+
+  assert.ok(result.plan.warnings.some((warning) => warning.includes('outside the observed dataset range')));
+});
+
+test('enforces a configured prediction-row limit before issuing a plan token', async () => {
+  const { service } = createService(regressionCsv, {
+    maxCategoricalValues: 50,
+    maxEncodedFeatures: 500,
+    maxPredictionRows: 1,
+    minUsableRows: 20,
+    maxClassificationClasses: 10,
+  });
+
+  await assert.rejects(service.create({
+    datasetId: 'employee-compensation', question: 'Estimate salary', targetColumn: 'annual_salary',
+    featureColumns: ['years_experience'], taskType: 'regression',
+    predictionRows: [{ years_experience: 10 }, { years_experience: 11 }],
+  }), /maximum of 1 prediction row/);
 });

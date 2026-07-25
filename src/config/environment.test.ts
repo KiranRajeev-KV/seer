@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { loadAnalysisPlanConfig, loadMlServiceConfig } from './environment.js';
+import { loadAnalysisLimits, loadAnalysisPlanConfig, loadMlServiceConfig } from './environment.js';
 
 test('loads a valid HTTPS ML-service configuration', () => {
   const config = loadMlServiceConfig({
@@ -12,6 +12,17 @@ test('loads a valid HTTPS ML-service configuration', () => {
     baseUrl: 'https://seer-ml.example.com',
     apiKey: 'test-secret',
     timeoutMs: 120_000,
+    maxRetries: 1,
+  });
+});
+
+test('loads configurable analysis limits with safe defaults', () => {
+  assert.deepEqual(loadAnalysisLimits({}), {
+    maxCategoricalValues: 50,
+    maxEncodedFeatures: 500,
+    maxPredictionRows: 10,
+    minUsableRows: 20,
+    maxClassificationClasses: 10,
   });
 });
 
