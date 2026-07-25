@@ -4,6 +4,7 @@ src/widgets/node_modules/
 
 # Build outputs
 dist/
+.next/
 src/widgets/.next/
 src/widgets/out/
 
@@ -45,6 +46,12 @@ uploads/
 # TypeScript cache
 *.tsbuildinfo
 
+# Python service
+ml-service/.venv/
+ml-service/.pytest_cache/
+ml-service/**/__pycache__/
+*.pyc
+
 # Optional npm cache
 .npm/
 
@@ -55,3 +62,4 @@ uploads/
 *.pem
 *.key
 tokens.json
+.nitrostudio/
