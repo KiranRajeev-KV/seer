@@ -1,7 +1,14 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { ExecutionContext } from '@nitrostack/core';
-import { DatasetsTools } from './datasets.tools.js';
+import { DatasetsTools, profileDatasetInputSchema } from './datasets.tools.js';
+
+test('accepts every approved dataset ID and rejects unknown IDs', () => {
+  for (const datasetId of ['employee-compensation', 'employee-attrition', 'iris', 'titanic', 'wine', 'auto-mpg']) {
+    assert.equal(profileDatasetInputSchema.safeParse({ datasetId }).success, true);
+  }
+  assert.equal(profileDatasetInputSchema.safeParse({ datasetId: 'not-a-dataset' }).success, false);
+});
 
 test('profiles only the allowlisted packaged dataset and logs dimensions', async () => {
   let profileDatasetId = '';

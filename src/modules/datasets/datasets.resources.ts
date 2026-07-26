@@ -34,4 +34,44 @@ export class DatasetsResources {
   async getEmployeeAttritionCsv(_uri: string, _context: ExecutionContext) {
     return this.datasets.readCsvText('employee-attrition');
   }
+
+  @Resource({
+    uri: 'seer://datasets/iris',
+    name: 'Iris CSV',
+    description: 'Classic flower-measurement data for three-way species classification.',
+    mimeType: 'text/csv',
+  })
+  async getIrisCsv(_uri: string, _context: ExecutionContext) {
+    return this.datasets.readCsvText('iris');
+  }
+
+  @Resource({
+    uri: 'seer://datasets/titanic',
+    name: 'Titanic CSV',
+    description: 'Historical passenger data for educational survival classification; not causal or individual decision-making data.',
+    mimeType: 'text/csv',
+  })
+  async getTitanicCsv(_uri: string, _context: ExecutionContext) {
+    return this.datasets.readCsvText('titanic');
+  }
+
+  @Resource({
+    uri: 'seer://datasets/wine',
+    name: 'Wine CSV',
+    description: 'Classic chemical-measurement data for three-way cultivar classification.',
+    mimeType: 'text/csv',
+  })
+  async getWineCsv(_uri: string, _context: ExecutionContext) {
+    return this.datasets.readCsvText('wine');
+  }
+
+  @Resource({
+    uri: 'seer://datasets/auto-mpg',
+    name: 'Auto MPG CSV',
+    description: 'Classic vehicle data for estimating city-cycle fuel economy.',
+    mimeType: 'text/csv',
+  })
+  async getAutoMpgCsv(_uri: string, _context: ExecutionContext) {
+    return this.datasets.readCsvText('auto-mpg');
+  }
 }
