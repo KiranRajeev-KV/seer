@@ -11,7 +11,7 @@ export const createAnalysisPlanInputSchema = z.object({
   question: z.string().trim().min(1).max(2_000).describe('The user’s predictive question.'),
   targetColumn: z.string().trim().min(1).describe('The column to predict.'),
   featureColumns: z.array(z.string().trim().min(1)).min(1).max(49).describe('Columns used as model inputs.'),
-  taskType: taskTypeSchema.describe('Use regression for continuous numeric targets and classification for labels.'),
+  taskType: taskTypeSchema.describe('Use regression when estimating a number, and classification when choosing a category or yes/no answer.'),
   predictionRows: z.array(z.record(predictionValueSchema)).min(1).max(10).describe('One to ten complete feature-value rows to predict.'),
 }).strict();
 

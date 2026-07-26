@@ -36,7 +36,7 @@ export default function AnalysisPlanWidget() {
   const maxHeight = useMaxHeight();
   const { isReady, getToolOutput, callTool, sendFollowUpMessage } = useWidgetSDK();
   const data = getToolOutput<PlanData>();
-  const [status, setStatus] = useState<'ready' | 'approving' | 'approved' | 'error'>('ready');
+  const [status, setStatus] = useState<'ready' | 'approving' | 'approved' | 'rejected' | 'error'>('ready');
   const [rejectionReason, setRejectionReason] = useState('');
   const dark = theme === 'dark';
   const colors = {
@@ -65,8 +65,9 @@ export default function AnalysisPlanWidget() {
   };
 
   const reject = () => {
-    const reason = rejectionReason.trim() || 'Please revise the proposed target, features, task type, or prediction inputs.';
-    sendFollowUpMessage(`I do not approve this Seer analysis plan. ${reason}`);
+    const reason = rejectionReason.trim() || 'Please create a new plan. I want to change the question, the information used, or the details for the estimate.';
+    setStatus('rejected');
+    sendFollowUpMessage(`I reject this Seer analysis plan. ${reason}`);
   };
 
   return (
@@ -77,7 +78,7 @@ export default function AnalysisPlanWidget() {
           <h1 style={{ fontSize: 22, margin: '5px 0 3px' }}>Review before execution</h1>
           <p style={{ color: colors.muted, margin: 0, fontSize: 13 }}>This signed plan expires {new Date(data.expiresAt).toLocaleTimeString()}.</p>
         </div>
-        <Badge text={data.plan.taskType} tone={data.plan.taskType === 'regression' ? '#0ea5e9' : '#8b5cf6'} />
+        <Badge text={data.plan.taskType === 'regression' ? 'estimate a number' : 'choose a category'} tone={data.plan.taskType === 'regression' ? '#0ea5e9' : '#8b5cf6'} />
       </header>
 
       <Section title="Question and selected data" colors={colors}>
@@ -85,20 +86,20 @@ export default function AnalysisPlanWidget() {
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 8 }}>
           <Fact label="Dataset" value={data.plan.datasetId.replace(/-/g, ' ')} colors={colors} />
           <Fact label="Target" value={data.plan.targetColumn} colors={colors} />
-          <Fact label="Split" value={`${data.plan.split.trainingPercent}/${data.plan.split.testPercent} · seed ${data.plan.split.randomState}`} colors={colors} />
+          <Fact label="How we check it" value={`${data.plan.split.trainingPercent}% to learn · ${data.plan.split.testPercent}% to check`} colors={colors} />
           <Fact label="Usable rows" value={`${data.plan.rows.usable} of ${data.plan.rows.dataset}`} colors={colors} />
         </div>
         <LabelledList label="Features" values={data.plan.featureColumns} colors={colors} />
       </Section>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginTop: 12 }}>
-        <Section title="Preprocessing" colors={colors}>
-          <LabelledList label="Numeric" values={data.plan.preprocessing.numeric} colors={colors} />
-          <p style={{ color: colors.muted, fontSize: 12, margin: '8px 0 12px' }}>{data.plan.preprocessing.numericImputer} imputation → {data.plan.preprocessing.numericScaler} scaling</p>
-          <LabelledList label="Categorical" values={data.plan.preprocessing.categorical} colors={colors} />
-          <p style={{ color: colors.muted, fontSize: 12, margin: '8px 0 0' }}>{data.plan.preprocessing.categoricalImputer} imputation → {data.plan.preprocessing.categoricalEncoder} encoding</p>
+        <Section title="How Seer will prepare the data" colors={colors}>
+          <LabelledList label="Number columns" values={data.plan.preprocessing.numeric} colors={colors} />
+          <p style={{ color: colors.muted, fontSize: 12, margin: '8px 0 12px' }}>Missing numbers are filled using a typical value, then numbers are put on a comparable scale.</p>
+          <LabelledList label="Choice columns" values={data.plan.preprocessing.categorical} colors={colors} />
+          <p style={{ color: colors.muted, fontSize: 12, margin: '8px 0 0' }}>Missing choices are filled with the most common choice, then changed into a form Seer can use.</p>
         </Section>
-        <Section title="Prediction inputs" colors={colors}>
+        <Section title="Details for this estimate" colors={colors}>
           {data.plan.predictionRows.map((row, index) => <div key={index} style={{ borderTop: index ? `1px solid ${colors.border}` : undefined, paddingTop: index ? 9 : 0, marginTop: index ? 9 : 0 }}>
             <strong style={{ fontSize: 12 }}>Row {index + 1}</strong>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '5px 10px', marginTop: 6, fontSize: 12 }}>
@@ -114,14 +115,14 @@ export default function AnalysisPlanWidget() {
 
       {[...data.plan.assumptions, ...data.plan.warnings].map((message) => <div key={message} style={{ background: colors.warning, border: `1px solid ${dark ? '#6b3b12' : '#fed7aa'}`, borderRadius: 8, padding: '9px 11px', fontSize: 13, marginTop: 10 }}>{message}</div>)}
 
-      {status === 'approved' ? <div style={{ background: colors.success, border: `1px solid ${dark ? '#1c7053' : '#86efac'}`, borderRadius: 9, padding: 12, marginTop: 12, fontWeight: 700 }}>Analysis completed. Review the results widget for model quality, predictions, and limitations.</div> : <Section title="Your approval" colors={colors}>
-        <p style={{ color: colors.muted, fontSize: 13, marginTop: 0 }}>Approval exchanges this review token for an execution-only token after verifying the signed plan and unchanged dataset, then trains and evaluates the selected model.</p>
+      {status === 'approved' ? <div style={{ background: colors.success, border: `1px solid ${dark ? '#1c7053' : '#86efac'}`, borderRadius: 9, padding: 12, marginTop: 12, fontWeight: 700 }}>Your estimate is ready. Review what it means, how reliable it was, and its important limits.</div> : status === 'rejected' ? <div style={{ background: colors.warning, border: `1px solid ${dark ? '#6b3b12' : '#fed7aa'}`, borderRadius: 9, padding: 12, marginTop: 12, fontWeight: 700 }}>Plan rejected. Tell Seer what you want to change, and it will prepare a new plan.</div> : <Section title="Your approval" colors={colors}>
+        <p style={{ color: colors.muted, fontSize: 13, marginTop: 0 }}>If you approve, Seer will first check that this plan and the data have not changed. It will then learn from the data and give an explained estimate. It cannot run without your approval.</p>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
           <button type="button" onClick={approve} disabled={status === 'approving'} style={buttonStyle('#0284c7', '#ffffff')}>{status === 'approving' ? 'Confirming and running…' : 'Approve and run analysis'}</button>
-          <button type="button" onClick={reject} style={buttonStyle(dark ? '#253b55' : '#e2e8f0', colors.ink)}>Request changes</button>
+          <button type="button" onClick={reject} style={buttonStyle(dark ? '#5b2630' : '#fee2e2', dark ? '#fecdd3' : '#991b1b')}>Reject plan</button>
         </div>
         {status === 'error' && <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 0 }}>Approval could not be verified. Create a new plan and try again.</p>}
-        <textarea value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} placeholder="Optional: say what should change" style={{ marginTop: 10, width: '100%', minHeight: 52, resize: 'vertical', border: `1px solid ${colors.border}`, borderRadius: 7, background: colors.canvas, color: colors.ink, padding: 8, boxSizing: 'border-box', font: 'inherit', fontSize: 13 }} />
+        <textarea value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} placeholder="Optional: say why you are rejecting this plan" style={{ marginTop: 10, width: '100%', minHeight: 52, resize: 'vertical', border: `1px solid ${colors.border}`, borderRadius: 7, background: colors.canvas, color: colors.ink, padding: 8, boxSizing: 'border-box', font: 'inherit', fontSize: 13 }} />
       </Section>}
     </main>
   );
