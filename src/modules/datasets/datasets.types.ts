@@ -11,6 +11,20 @@ export const approvedDatasetIds = [
 
 export const datasetIdSchema = z.enum(approvedDatasetIds);
 
+/**
+ * How a target column's values should be shown. Declared per dataset and never
+ * inferred: a column named `annual_salary` says nothing about whether its
+ * numbers are rupees, dollars or points, so an undeclared target stays a bare
+ * number.
+ */
+export const targetDisplaySchema = z.object({
+  column: z.string().min(1),
+  unit: z.string().min(1),
+  decimals: z.number().int().min(0).max(6),
+});
+
+export type TargetDisplay = z.infer<typeof targetDisplaySchema>;
+
 export const datasetDefinitionSchema = z.object({
   id: datasetIdSchema,
   name: z.string().min(1),
@@ -19,6 +33,7 @@ export const datasetDefinitionSchema = z.object({
   rows: z.number().int().positive(),
   columns: z.number().int().positive(),
   fileName: z.string().regex(/^[a-z0-9-]+\.csv$/),
+  targetDisplay: targetDisplaySchema.optional(),
 });
 
 export const datasetCatalogSchema = z.object({

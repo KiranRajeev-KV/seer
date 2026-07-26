@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { mlServiceClassificationAnalysisSchema, mlServiceRegressionAnalysisSchema } from '../ml-client/ml-client.schemas.js';
+import { targetDisplaySchema } from '../datasets/datasets.types.js';
 
 export const taskTypeSchema = z.enum(['regression', 'classification']);
 export type TaskType = z.infer<typeof taskTypeSchema>;
@@ -76,9 +77,15 @@ export const runAnalysisInputSchema = z.object({
   executionToken: z.string().min(1),
 }).strict();
 
+const runAnalysisContextSchema = {
+  question: z.string().min(1),
+  targetColumn: z.string().min(1),
+  targetDisplay: targetDisplaySchema.optional(),
+};
+
 export const runAnalysisResponseSchema = z.discriminatedUnion('taskType', [
-  mlServiceRegressionAnalysisSchema.extend({ question: z.string().min(1), targetColumn: z.string().min(1) }),
-  mlServiceClassificationAnalysisSchema.extend({ question: z.string().min(1), targetColumn: z.string().min(1) }),
+  mlServiceRegressionAnalysisSchema.extend(runAnalysisContextSchema),
+  mlServiceClassificationAnalysisSchema.extend(runAnalysisContextSchema),
 ]);
 
 export type RunAnalysisResponse = z.infer<typeof runAnalysisResponseSchema>;

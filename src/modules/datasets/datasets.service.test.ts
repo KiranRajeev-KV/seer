@@ -25,7 +25,7 @@ test('reads the compiled employee attrition CSV asset', async () => {
   const csv = await datasets.readCsvText('employee-attrition');
 
   assert.match(csv, /^tenure_years,monthly_hours,performance_rating,department,work_arrangement,attrition/);
-  assert.equal(csv.trim().split('\n').length, 61);
+  assert.equal(csv.trim().split('\n').length, 421);
 });
 
 test('reads all classic CSV snapshots with their expected schema and row count', async () => {

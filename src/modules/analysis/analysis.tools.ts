@@ -85,7 +85,12 @@ export class AnalysisTools {
         quality: result.quality,
         requestId: context.requestId,
       });
-      return { ...result, question: approved.plan.question, targetColumn: approved.plan.targetColumn };
+      return {
+        ...result,
+        question: approved.plan.question,
+        targetColumn: approved.plan.targetColumn,
+        ...(approved.targetDisplay ? { targetDisplay: approved.targetDisplay } : {}),
+      };
     } catch (error) {
       const code = error instanceof MlServiceError ? error.code : 'analysis_error';
       context.logger.error('Analysis failed', { code, requestId: context.requestId });

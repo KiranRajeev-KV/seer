@@ -2,7 +2,12 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['nitrostack'],
-  
+
+  // Build traces describe a Node server deployment. These widgets are exported
+  // as static HTML, so the trace pass has nothing to serve and its file probing
+  // fails intermittently on a cold build.
+  outputFileTracing: false,
+
   // Static export for production builds
   ...(process.env.NODE_ENV === 'production' && {
     output: 'export',

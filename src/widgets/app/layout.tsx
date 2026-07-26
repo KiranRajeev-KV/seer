@@ -1,16 +1,19 @@
 'use client';
 
-import { WidgetLayout } from '@nitrostack/widgets';
-
+import { useTheme, WidgetLayout } from '@nitrostack/widgets';
+import './globals.css';
 
 export default function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // The host reports its theme, or null before it has told us. Light is the default.
+  const theme = useTheme();
+
   return (
-    <html lang="en">
-      <body style={{ margin: 0, padding: 0, fontFamily: 'system-ui, sans-serif' }}>
+    <html lang="en" className={theme === 'dark' ? 'dark' : undefined}>
+      <body>
         <WidgetLayout>{children}</WidgetLayout>
       </body>
     </html>
