@@ -2,6 +2,7 @@ import { createHash, timingSafeEqual } from 'node:crypto';
 import { Injectable } from '@nitrostack/core';
 import { loadAnalysisLimits, type AnalysisLimits } from '../../config/environment.js';
 import { DatasetsService } from '../datasets/datasets.service.js';
+import type { TargetDisplay } from '../datasets/datasets.types.js';
 import {
   type AnalysisPlan,
   type ConfirmAnalysisPlanResponse,
@@ -64,9 +65,23 @@ export class AnalysisService {
     };
   }
 
-  async prepareRun(executionToken: string): Promise<{ plan: AnalysisPlan; csv: Buffer; expiresAt: string }> {
+  async prepareRun(executionToken: string): Promise<{ plan: AnalysisPlan; csv: Buffer; expiresAt: string; targetDisplay?: TargetDisplay }> {
     const prepared = await this.prepareToken(executionToken, 'execution');
-    return { plan: prepared.plan, csv: prepared.csv, expiresAt: prepared.expiresAt };
+    return {
+      plan: prepared.plan,
+      csv: prepared.csv,
+      expiresAt: prepared.expiresAt,
+      targetDisplay: await this.targetDisplayFor(prepared.plan),
+    };
+  }
+
+  /**
+   * Only applies when the dataset declares a display for exactly the column
+   * being predicted. Units are never guessed from a column name.
+   */
+  private async targetDisplayFor(plan: AnalysisPlan): Promise<TargetDisplay | undefined> {
+    const dataset = await this.datasets.get(plan.datasetId);
+    return dataset.targetDisplay?.column === plan.targetColumn ? dataset.targetDisplay : undefined;
   }
 
   private async prepareToken(

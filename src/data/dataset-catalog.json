@@ -7,14 +7,19 @@
       "taskHints": ["regression"],
       "rows": 1500,
       "columns": 9,
-      "fileName": "employee-compensation.csv"
+      "fileName": "employee-compensation.csv",
+      "targetDisplay": {
+        "column": "annual_salary",
+        "unit": "INR/year",
+        "decimals": 0
+      }
     },
     {
       "id": "employee-attrition",
       "name": "Employee Attrition",
       "description": "Synthetic employee attrition data with numeric and categorical workplace features.",
       "taskHints": ["classification"],
-      "rows": 60,
+      "rows": 420,
       "columns": 6,
       "fileName": "employee-attrition.csv"
     }
