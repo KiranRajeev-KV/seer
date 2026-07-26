@@ -55,6 +55,44 @@
       "tags": ["analysis", "machine-learning", "approval"]
     },
     {
+      "uri": "/analysis-confirmation",
+      "name": "Analysis Plan Confirmation",
+      "description": "Confirm that an approved Seer plan passed its integrity and dataset checks.",
+      "examples": [
+        {
+          "name": "Approved employee compensation plan",
+          "description": "The reviewed plan is unchanged and ready to run.",
+          "data": {
+            "approved": true,
+            "executionToken": "example-execution-token",
+            "expiresAt": "2026-07-26T12:15:00.000Z",
+            "plan": {
+              "datasetId": "employee-compensation",
+              "question": "What salary is estimated for a developer with ten years of experience?",
+              "targetColumn": "annual_salary",
+              "featureColumns": ["years_experience", "education_level", "department"],
+              "taskType": "regression",
+              "predictionRows": [{"years_experience": 10, "education_level": "master", "department": "engineering"}],
+              "preprocessing": {
+                "numeric": ["years_experience"],
+                "categorical": ["education_level", "department"],
+                "numericImputer": "median",
+                "numericScaler": "standard",
+                "categoricalImputer": "most_frequent",
+                "categoricalEncoder": "one_hot"
+              },
+              "rows": {"dataset": 1500, "missingTarget": 0, "usable": 1500},
+              "excludedColumns": [],
+              "assumptions": [],
+              "warnings": [],
+              "split": {"trainingPercent": 80, "testPercent": 20, "randomState": 42}
+            }
+          }
+        }
+      ],
+      "tags": ["analysis", "machine-learning", "approval", "confirmation"]
+    },
+    {
       "uri": "/analysis-results",
       "name": "Analysis Results",
       "description": "Transparent regression or classification evaluation, predictions, diagnostics, and limitations.",

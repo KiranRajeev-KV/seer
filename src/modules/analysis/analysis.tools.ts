@@ -43,6 +43,7 @@ export class AnalysisTools {
     outputSchema: confirmAnalysisPlanResponseSchema,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   })
+  @Widget('analysis-confirmation')
   async confirmAnalysisPlan(input: z.infer<typeof confirmAnalysisPlanInputSchema>, context: ExecutionContext) {
     const result = await this.analysis.confirm(input.reviewToken);
     context.logger.info('Analysis plan confirmed', {

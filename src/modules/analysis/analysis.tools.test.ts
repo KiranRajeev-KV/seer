@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import type { ExecutionContext } from '@nitrostack/core';
+import { getWidgetMetadata, type ExecutionContext } from '@nitrostack/core';
 import { AnalysisTools } from './analysis.tools.js';
 
 const plan = {
@@ -8,6 +8,13 @@ const plan = {
   preprocessing: { numeric: ['years_experience'], categorical: [], numericImputer: 'median' as const, numericScaler: 'standard' as const, categoricalImputer: 'most_frequent' as const, categoricalEncoder: 'one_hot' as const },
   rows: { dataset: 30, missingTarget: 0, usable: 30 }, excludedColumns: [], assumptions: [], warnings: [], split: { trainingPercent: 80 as const, testPercent: 20 as const, randomState: 42 as const },
 };
+
+test('links plan confirmation to a widget so its execution token is returned as structured content', () => {
+  assert.deepEqual(
+    getWidgetMetadata(AnalysisTools.prototype, 'confirmAnalysisPlan'),
+    { route: 'analysis-confirmation' },
+  );
+});
 
 test('creates, confirms, and executes plans through thin MCP tool interfaces', async () => {
   const calls: string[] = [];
