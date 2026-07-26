@@ -27,6 +27,44 @@ The bundled synthetic datasets demonstrate both supported task types:
 | Employee Compensation | Regression | `annual_salary` |
 | Employee Attrition | Classification | `attrition` |
 
+The attrition data is generated from a latent probability rather than a rule, so
+the classes overlap on every feature, a share of rows contradict the trend, and
+the model lands well short of perfect. That is deliberate: a near-perfect score
+on synthetic data demonstrates nothing.
+
+## The quality label is a heuristic
+
+Every result carries one of three labels. They come from a fixed threshold the
+ML service applies to a single train/test split:
+
+| Label | Rule |
+| --- | --- |
+| Better than the comparison | Regression MAE improves by at least 5%, or classification weighted F1 improves by at least 5 absolute points |
+| Slightly better | Any improvement below that threshold |
+| Not better | No improvement over the baseline |
+
+This is a product heuristic for describing one comparison in plain language. It
+is **not** a test of statistical significance, a confidence interval, or
+evidence that the result generalises beyond the split it was measured on. The
+thresholds were chosen for legibility, not derived from the data.
+
+Classification probabilities come directly from `predict_proba`. Seer does not
+evaluate calibration, so they are reported as the model's own assigned
+probability and must not be read as a measured likelihood.
+
+## Target display metadata
+
+A dataset may declare how its target should be shown. Seer never infers a unit
+from a column name—`annual_salary` says nothing about rupees versus dollars—so
+an undeclared target renders as a bare number:
+
+```json
+"targetDisplay": { "column": "annual_salary", "unit": "INR/year", "decimals": 0 }
+```
+
+The display applies only when `column` matches the target actually being
+predicted.
+
 ## Supported scope
 
 - One target column with numeric and categorical input features.
