@@ -96,7 +96,9 @@ Use the tools in this order:
 5. Present the returned metrics, warnings, limitations, and chart data as
    estimates—not guarantees.
 
-The `seer_guided_analysis` prompt supplies this sequence to MCP hosts.
+The `seer_guided_analysis` prompt supplies this sequence to MCP hosts, and the
+`seer_getting_started` prompt introduces Seer's scope and approved datasets to a
+new user before any tool is called.
 `run_analysis` rejects review tokens as well as altered, expired, or
 dataset-mismatched execution tokens. The current NitroStack runtime does not
 expose MCP elicitation, so compatible hosts must obtain the user’s explicit
