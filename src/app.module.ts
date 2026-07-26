@@ -3,6 +3,7 @@ import { SystemHealthCheck } from './health/system.health.js';
 import { DatasetsModule } from './modules/datasets/datasets.module.js';
 import { MlClientModule } from './modules/ml-client/ml-client.module.js';
 import { AnalysisModule } from './modules/analysis/analysis.module.js';
+import { HelpModule } from './modules/help/help.module.js';
 
 /**
  * Root module for the Seer MCP server.
@@ -25,6 +26,7 @@ import { AnalysisModule } from './modules/analysis/analysis.module.js';
     MlClientModule,
     DatasetsModule,
     AnalysisModule,
+    HelpModule,
   ],
   providers: [
     SystemHealthCheck,

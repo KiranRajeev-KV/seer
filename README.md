@@ -98,7 +98,9 @@ Use the tools in this order:
 
 The `seer_guided_analysis` prompt supplies this sequence to MCP hosts, and the
 `seer_getting_started` prompt introduces Seer's scope and approved datasets to a
-new user before any tool is called.
+new user before any tool is called. The `seer_help` tool returns the same
+orientation on demand—capabilities, approved datasets, tool order, and the
+limits currently enforced—for hosts that cannot surface prompts.
 `run_analysis` rejects review tokens as well as altered, expired, or
 dataset-mismatched execution tokens. The current NitroStack runtime does not
 expose MCP elicitation, so compatible hosts must obtain the user’s explicit
