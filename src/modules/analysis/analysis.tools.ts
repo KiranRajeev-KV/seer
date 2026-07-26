@@ -1,6 +1,7 @@
 import { ExecutionContext, Injectable, ToolDecorator as Tool, Widget, z } from '@nitrostack/core';
 import {
   confirmAnalysisPlanInputSchema,
+  confirmAnalysisPlanResponseSchema,
   createAnalysisPlanInputSchema,
   createAnalysisPlanResponseSchema,
   runAnalysisInputSchema,
@@ -39,6 +40,7 @@ export class AnalysisTools {
     name: 'confirm_analysis_plan',
     description: 'After the user explicitly approves a Seer plan, exchange its review token for an execution token. This verifies signature, expiration, and dataset hash; it does not train a model.',
     inputSchema: confirmAnalysisPlanInputSchema,
+    outputSchema: confirmAnalysisPlanResponseSchema,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   })
   async confirmAnalysisPlan(input: z.infer<typeof confirmAnalysisPlanInputSchema>, context: ExecutionContext) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useMaxHeight, useTheme, useWidgetSDK } from '@nitrostack/widgets';
+import { useMaxHeight, useTheme, useWidgetSDK, type CallToolResponse } from '@nitrostack/widgets';
 
 interface PlanData {
   reviewToken: string;
@@ -56,8 +56,8 @@ export default function AnalysisPlanWidget() {
   const approve = async () => {
     setStatus('approving');
     try {
-      const confirmation = await callTool('confirm_analysis_plan', { reviewToken: data.reviewToken }) as { executionToken: string };
-      await callTool('run_analysis', { executionToken: confirmation.executionToken });
+      const confirmation = await callTool('confirm_analysis_plan', { reviewToken: data.reviewToken });
+      await callTool('run_analysis', { executionToken: executionTokenFrom(confirmation) });
       setStatus('approved');
     } catch {
       setStatus('error');
@@ -125,6 +125,29 @@ export default function AnalysisPlanWidget() {
       </Section>}
     </main>
   );
+}
+
+/**
+ * A tool call resolves to the host's response envelope, not the tool's payload:
+ * the approved plan arrives as structuredContent, or as a JSON result string.
+ */
+function executionTokenFrom(response: CallToolResponse): string {
+  if (response.isError) {
+    throw new Error('Seer could not confirm the analysis plan.');
+  }
+  const payload = (response.structuredContent ?? parseJson(response.result)) as { executionToken?: unknown } | undefined;
+  if (typeof payload?.executionToken !== 'string' || !payload.executionToken) {
+    throw new Error('Seer did not return an execution token for the approved plan.');
+  }
+  return payload.executionToken;
+}
+
+function parseJson(value: string): unknown {
+  try {
+    return JSON.parse(value);
+  } catch {
+    return undefined;
+  }
 }
 
 function Section({ title, colors, children }: { title: string; colors: Record<'canvas' | 'panel' | 'ink' | 'muted' | 'border' | 'warning' | 'success', string>; children: React.ReactNode }) {
