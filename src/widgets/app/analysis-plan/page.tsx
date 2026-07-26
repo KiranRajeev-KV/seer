@@ -1,7 +1,22 @@
 'use client';
 
 import { useState } from 'react';
-import { useMaxHeight, useTheme, useWidgetSDK, type CallToolResponse } from '@nitrostack/widgets';
+import { useMaxHeight, useWidgetSDK, type CallToolResponse } from '@nitrostack/widgets';
+import {
+  autoGrid,
+  autoGridStyle,
+  buttonPrimary,
+  buttonQuiet,
+  cx,
+  Field,
+  Frame,
+  Loading,
+  Masthead,
+  Note,
+  Panel,
+  Tag,
+  TagRow,
+} from '@/design/primitives';
 
 interface PlanData {
   reviewToken: string;
@@ -32,25 +47,14 @@ interface PlanData {
 export const dynamic = 'force-dynamic';
 
 export default function AnalysisPlanWidget() {
-  const theme = useTheme();
   const maxHeight = useMaxHeight();
   const { isReady, getToolOutput, callTool, sendFollowUpMessage } = useWidgetSDK();
   const data = getToolOutput<PlanData>();
   const [status, setStatus] = useState<'ready' | 'approving' | 'approved' | 'rejected' | 'error'>('ready');
   const [rejectionReason, setRejectionReason] = useState('');
-  const dark = theme === 'dark';
-  const colors = {
-    canvas: dark ? '#07111f' : '#f5f8fc',
-    panel: dark ? '#0e1c2f' : '#ffffff',
-    ink: dark ? '#e7eef8' : '#132238',
-    muted: dark ? '#9db0c8' : '#64748b',
-    border: dark ? '#20354f' : '#dbe5ef',
-    warning: dark ? '#44240c' : '#fff4df',
-    success: dark ? '#113a2d' : '#e8f8ef',
-  };
 
   if (!isReady || !data) {
-    return <div style={{ padding: 24, color: colors.ink }}>Preparing analysis plan…</div>;
+    return <Loading>Preparing the plan…</Loading>;
   }
 
   const approve = async () => {
@@ -70,61 +74,119 @@ export default function AnalysisPlanWidget() {
     sendFollowUpMessage(`I reject this Seer analysis plan. ${reason}`);
   };
 
+  const { plan } = data;
+
   return (
-    <main style={{ background: colors.canvas, color: colors.ink, minHeight: 400, maxHeight: maxHeight || 680, overflow: 'auto', padding: 16, boxSizing: 'border-box' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 16, marginBottom: 16 }}>
-        <div>
-          <p style={{ color: '#0ea5e9', fontSize: 12, fontWeight: 800, letterSpacing: '0.08em', margin: 0 }}>SEER / ANALYSIS PLAN</p>
-          <h1 style={{ fontSize: 22, margin: '5px 0 3px' }}>Review before execution</h1>
-          <p style={{ color: colors.muted, margin: 0, fontSize: 13 }}>This signed plan expires {new Date(data.expiresAt).toLocaleTimeString()}.</p>
-        </div>
-        <Badge text={data.plan.taskType === 'regression' ? 'estimate a number' : 'choose a category'} tone={data.plan.taskType === 'regression' ? '#0ea5e9' : '#8b5cf6'} />
-      </header>
+    <Frame maxHeight={maxHeight}>
+      <Masthead
+        label="Plan awaiting your approval"
+        title={plan.question}
+        subtitle={`Seer will ${plan.taskType === 'regression' ? 'estimate a number' : 'choose a category'} for ${plan.targetColumn.replace(/_/g, ' ')}. Nothing runs until you approve it.`}
+        aside={<Tag tone="signal">expires {new Date(data.expiresAt).toLocaleTimeString()}</Tag>}
+      />
 
-      <Section title="Question and selected data" colors={colors}>
-        <p style={{ margin: '0 0 10px', fontWeight: 650 }}>{data.plan.question}</p>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 8 }}>
-          <Fact label="Dataset" value={data.plan.datasetId.replace(/-/g, ' ')} colors={colors} />
-          <Fact label="Target" value={data.plan.targetColumn} colors={colors} />
-          <Fact label="How we check it" value={`${data.plan.split.trainingPercent}% to learn · ${data.plan.split.testPercent}% to check`} colors={colors} />
-          <Fact label="Usable rows" value={`${data.plan.rows.usable} of ${data.plan.rows.dataset}`} colors={colors} />
+      <Panel title="What Seer will use">
+        <div className={autoGrid} style={autoGridStyle(160)}>
+          <Field label="Dataset" value={plan.datasetId.replace(/-/g, ' ')} />
+          <Field label="Estimating" value={plan.targetColumn} />
+          <Field label="How we check it" value={`${plan.split.trainingPercent}% learn · ${plan.split.testPercent}% check`} />
+          <Field label="Usable rows" value={`${plan.rows.usable} of ${plan.rows.dataset}`} />
         </div>
-        <LabelledList label="Features" values={data.plan.featureColumns} colors={colors} />
-      </Section>
+        <div className="mt-3">
+          <TagRow label="Information it will look at" values={plan.featureColumns} />
+        </div>
+      </Panel>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 12, marginTop: 12 }}>
-        <Section title="How Seer will prepare the data" colors={colors}>
-          <LabelledList label="Number columns" values={data.plan.preprocessing.numeric} colors={colors} />
-          <p style={{ color: colors.muted, fontSize: 12, margin: '8px 0 12px' }}>Missing numbers are filled using a typical value, then numbers are put on a comparable scale.</p>
-          <LabelledList label="Choice columns" values={data.plan.preprocessing.categorical} colors={colors} />
-          <p style={{ color: colors.muted, fontSize: 12, margin: '8px 0 0' }}>Missing choices are filled with the most common choice, then changed into a form Seer can use.</p>
-        </Section>
-        <Section title="Details for this estimate" colors={colors}>
-          {data.plan.predictionRows.map((row, index) => <div key={index} style={{ borderTop: index ? `1px solid ${colors.border}` : undefined, paddingTop: index ? 9 : 0, marginTop: index ? 9 : 0 }}>
-            <strong style={{ fontSize: 12 }}>Row {index + 1}</strong>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '5px 10px', marginTop: 6, fontSize: 12 }}>
-              {Object.entries(row).map(([key, value]) => <span key={key} style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={`${key}: ${value}`}><span style={{ color: colors.muted }}>{key}: </span>{String(value)}</span>)}
+      <div className={cx(autoGrid, 'mt-3')} style={autoGridStyle(260)}>
+        <Panel title="How the data is prepared" flush>
+          {plan.preprocessing.numeric.length > 0 && (
+            <>
+              <TagRow label="Number columns" values={plan.preprocessing.numeric} />
+              <p className="text-small text-muted mt-1 mb-3">
+                Missing numbers are filled using a typical value, then numbers are put on a comparable scale.
+              </p>
+            </>
+          )}
+          {plan.preprocessing.categorical.length > 0 && (
+            <>
+              <TagRow label="Choice columns" values={plan.preprocessing.categorical} />
+              <p className="text-small text-muted mt-1 mb-0">
+                Missing choices are filled with the most common choice, then changed into a form Seer can use.
+              </p>
+            </>
+          )}
+        </Panel>
+
+        <Panel title="Details for this estimate" flush>
+          {plan.predictionRows.map((row, index) => (
+            <div key={index} className={cx(index > 0 && 'border-t border-rule pt-2 mt-2')}>
+              {plan.predictionRows.length > 1 && (
+                <div className="font-mono tabular text-micro text-muted mb-1">Row {index + 1}</div>
+              )}
+              <div className="grid gap-1">
+                {Object.entries(row).map(([key, value]) => (
+                  <div key={key} className="flex justify-between gap-2 text-small">
+                    <span className="text-muted truncate">{key.replace(/_/g, ' ')}</span>
+                    <span className="font-mono tabular font-medium whitespace-nowrap">{String(value)}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>)}
-        </Section>
+          ))}
+        </Panel>
       </div>
 
-      {data.plan.excludedColumns.length > 0 && <Section title="Excluded columns" colors={colors}>
-        {data.plan.excludedColumns.map((column) => <p key={column.name} style={{ fontSize: 13, margin: '7px 0' }}><strong>{column.name}</strong><span style={{ color: colors.muted }}> — {column.reason}</span></p>)}
-      </Section>}
+      {plan.excludedColumns.length > 0 && (
+        <Panel title="Left out on purpose">
+          <div className="grid gap-2">
+            {plan.excludedColumns.map((column) => (
+              <div key={column.name} className="flex flex-wrap items-baseline gap-2">
+                <Tag tone="muted">{column.name}</Tag>
+                <span className="text-small text-muted">{column.reason}</span>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
 
-      {[...data.plan.assumptions, ...data.plan.warnings].map((message) => <div key={message} style={{ background: colors.warning, border: `1px solid ${dark ? '#6b3b12' : '#fed7aa'}`, borderRadius: 8, padding: '9px 11px', fontSize: 13, marginTop: 10 }}>{message}</div>)}
+      {[...plan.assumptions, ...plan.warnings].map((message) => <Note key={message}>{message}</Note>)}
 
-      {status === 'approved' ? <div style={{ background: colors.success, border: `1px solid ${dark ? '#1c7053' : '#86efac'}`, borderRadius: 9, padding: 12, marginTop: 12, fontWeight: 700 }}>Your estimate is ready. Review what it means, how reliable it was, and its important limits.</div> : status === 'rejected' ? <div style={{ background: colors.warning, border: `1px solid ${dark ? '#6b3b12' : '#fed7aa'}`, borderRadius: 9, padding: 12, marginTop: 12, fontWeight: 700 }}>Plan rejected. Tell Seer what you want to change, and it will prepare a new plan.</div> : <Section title="Your approval" colors={colors}>
-        <p style={{ color: colors.muted, fontSize: 13, marginTop: 0 }}>If you approve, Seer will first check that this plan and the data have not changed. It will then learn from the data and give an explained estimate. It cannot run without your approval.</p>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          <button type="button" onClick={approve} disabled={status === 'approving'} style={buttonStyle('#0284c7', '#ffffff')}>{status === 'approving' ? 'Confirming and running…' : 'Approve and run analysis'}</button>
-          <button type="button" onClick={reject} style={buttonStyle(dark ? '#5b2630' : '#fee2e2', dark ? '#fecdd3' : '#991b1b')}>Reject plan</button>
-        </div>
-        {status === 'error' && <p style={{ color: '#dc2626', fontSize: 13, marginBottom: 0 }}>Approval could not be verified. Create a new plan and try again.</p>}
-        <textarea value={rejectionReason} onChange={(event) => setRejectionReason(event.target.value)} placeholder="Optional: say why you are rejecting this plan" style={{ marginTop: 10, width: '100%', minHeight: 52, resize: 'vertical', border: `1px solid ${colors.border}`, borderRadius: 7, background: colors.canvas, color: colors.ink, padding: 8, boxSizing: 'border-box', font: 'inherit', fontSize: 13 }} />
-      </Section>}
-    </main>
+      {status === 'approved' ? (
+        <Panel accent="signal">
+          <strong className="font-strong">Your estimate is ready.</strong>
+          <span className="text-muted"> Review what it means, how reliable it was, and its important limits.</span>
+        </Panel>
+      ) : status === 'rejected' ? (
+        <Panel accent="caution">
+          <strong className="font-strong">Plan rejected.</strong>
+          <span className="text-muted"> Tell Seer what you want to change, and it will prepare a new plan.</span>
+        </Panel>
+      ) : (
+        <Panel accent="signal" title="Your approval">
+          <p className="text-small text-muted mt-0 mb-3">
+            If you approve, Seer will first check that this plan and the data have not changed. It will then learn from
+            the data and give an explained estimate. It cannot run without your approval.
+          </p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={approve} disabled={status === 'approving'} className={buttonPrimary}>
+              {status === 'approving' ? 'Confirming and running…' : 'Approve and run analysis'}
+            </button>
+            <button type="button" onClick={reject} className={buttonQuiet}>Reject plan</button>
+          </div>
+          {status === 'error' && (
+            <p className="text-small text-alert mt-2 mb-0">
+              Approval could not be verified. Create a new plan and try again.
+            </p>
+          )}
+          <textarea
+            value={rejectionReason}
+            onChange={(event) => setRejectionReason(event.target.value)}
+            placeholder="Optional: say why you are rejecting this plan"
+            className="mt-3 w-full min-h-[52px] resize-y rounded-md border border-rule bg-sunken text-ink p-2 text-small font-ui"
+          />
+        </Panel>
+      )}
+    </Frame>
   );
 }
 
@@ -149,24 +211,4 @@ function parseJson(value: string): unknown {
   } catch {
     return undefined;
   }
-}
-
-function Section({ title, colors, children }: { title: string; colors: Record<'canvas' | 'panel' | 'ink' | 'muted' | 'border' | 'warning' | 'success', string>; children: React.ReactNode }) {
-  return <section style={{ background: colors.panel, border: `1px solid ${colors.border}`, borderRadius: 10, padding: 13, marginTop: 12 }}><h2 style={{ fontSize: 14, margin: '0 0 11px' }}>{title}</h2>{children}</section>;
-}
-
-function Fact({ label, value, colors }: { label: string; value: string; colors: Record<'canvas' | 'panel' | 'ink' | 'muted' | 'border' | 'warning' | 'success', string> }) {
-  return <div style={{ background: colors.canvas, borderRadius: 8, padding: 8 }}><div style={{ color: colors.muted, fontSize: 10, fontWeight: 700, textTransform: 'uppercase' }}>{label}</div><div style={{ fontWeight: 700, fontSize: 13, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</div></div>;
-}
-
-function LabelledList({ label, values, colors }: { label: string; values: string[]; colors: Record<'canvas' | 'panel' | 'ink' | 'muted' | 'border' | 'warning' | 'success', string> }) {
-  return <div style={{ marginTop: 11 }}><div style={{ color: colors.muted, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', marginBottom: 6 }}>{label}</div><div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>{values.map((value) => <span key={value} style={{ border: `1px solid ${colors.border}`, borderRadius: 999, padding: '3px 7px', fontSize: 12 }}>{value}</span>)}</div></div>;
-}
-
-function Badge({ text, tone }: { text: string; tone: string }) {
-  return <span style={{ color: tone, background: `${tone}1c`, borderRadius: 999, padding: '5px 8px', fontSize: 11, fontWeight: 800, textTransform: 'uppercase' }}>{text}</span>;
-}
-
-function buttonStyle(background: string, color: string) {
-  return { background, color, border: 'none', borderRadius: 7, padding: '8px 11px', font: 'inherit', fontSize: 13, fontWeight: 700, cursor: 'pointer' } as const;
 }
