@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useMaxHeight, useWidgetSDK, type CallToolResponse } from '@nitrostack/widgets';
+import { useMaxHeight, useWidgetSDK } from '@nitrostack/widgets';
 import {
   autoGrid,
   autoGridStyle,
@@ -52,6 +52,7 @@ export default function AnalysisPlanWidget() {
   const data = getToolOutput<PlanData>();
   const [status, setStatus] = useState<'ready' | 'approving' | 'approved' | 'rejected' | 'error'>('ready');
   const [rejectionReason, setRejectionReason] = useState('');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   if (!isReady || !data) {
     return <Loading>Preparing the plan…</Loading>;
@@ -59,13 +60,18 @@ export default function AnalysisPlanWidget() {
 
   const approve = async () => {
     setStatus('approving');
+    setErrorMessage(null);
     try {
       const confirmation = await callTool('confirm_analysis_plan', { reviewToken: data.reviewToken });
-      await callTool('run_analysis', { executionToken: executionTokenFrom(confirmation) });
-      setStatus('approved');
-    } catch {
+      const executionToken = executionTokenFrom(confirmation);
+      const analysis = await callTool('run_analysis', { executionToken });
+      throwIfToolFailed(analysis, 'Seer could not run the approved plan.');
+    } catch (error) {
       setStatus('error');
+      setErrorMessage(errorMessageFor(error));
+      return;
     }
+    setStatus('approved');
   };
 
   const reject = () => {
@@ -175,7 +181,7 @@ export default function AnalysisPlanWidget() {
           </div>
           {status === 'error' && (
             <p className="text-small text-alert mt-2 mb-0">
-              Approval could not be verified. Create a new plan and try again.
+              {errorMessage ?? 'Seer could not confirm this plan. Create a new plan and try again.'}
             </p>
           )}
           <textarea
@@ -191,18 +197,69 @@ export default function AnalysisPlanWidget() {
 }
 
 /**
- * A tool call resolves to the host's response envelope, not the tool's payload:
- * the approved plan arrives as structuredContent, or as a JSON result string.
+ * Different MCP hosts return either the widget SDK envelope or the standard MCP
+ * result object. The confirmation tool has no widget of its own, so its token
+ * commonly arrives in content[].text rather than structuredContent.
  */
-function executionTokenFrom(response: CallToolResponse): string {
-  if (response.isError) {
-    throw new Error('Seer could not confirm the analysis plan.');
-  }
-  const payload = (response.structuredContent ?? parseJson(response.result)) as { executionToken?: unknown } | undefined;
-  if (typeof payload?.executionToken !== 'string' || !payload.executionToken) {
+function executionTokenFrom(response: unknown): string {
+  throwIfToolFailed(response, 'Seer could not confirm the analysis plan.');
+  const executionToken = findExecutionToken(response);
+  if (!executionToken) {
     throw new Error('Seer did not return an execution token for the approved plan.');
   }
-  return payload.executionToken;
+  return executionToken;
+}
+
+function throwIfToolFailed(response: unknown, fallback: string): void {
+  const envelope = asRecord(response);
+  if (envelope?.isError === true) {
+    throw new Error(findText(envelope.content) ?? findText(envelope.result) ?? fallback);
+  }
+}
+
+function findExecutionToken(value: unknown, seen = new Set<unknown>()): string | undefined {
+  if (value === null || value === undefined || seen.has(value)) return undefined;
+  if (typeof value === 'string') {
+    return findExecutionToken(parseJson(value), seen);
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const token = findExecutionToken(item, seen);
+      if (token) return token;
+    }
+    return undefined;
+  }
+
+  const record = asRecord(value);
+  if (!record) return undefined;
+  seen.add(value);
+  if (typeof record.executionToken === 'string' && record.executionToken) {
+    return record.executionToken;
+  }
+  for (const key of ['structuredContent', 'result', 'content', 'contents', 'text', 'data', 'json']) {
+    const token = findExecutionToken(record[key], seen);
+    if (token) return token;
+  }
+  return undefined;
+}
+
+function findText(value: unknown): string | undefined {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const text = findText(item);
+      if (text) return text;
+    }
+    return undefined;
+  }
+  const record = asRecord(value);
+  return typeof record?.text === 'string' ? record.text : undefined;
+}
+
+function asRecord(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined;
 }
 
 function parseJson(value: string): unknown {
@@ -211,4 +268,10 @@ function parseJson(value: string): unknown {
   } catch {
     return undefined;
   }
+}
+
+function errorMessageFor(error: unknown): string {
+  return error instanceof Error && error.message
+    ? error.message
+    : 'Seer could not complete the approval or analysis. Create a new plan and try again.';
 }
