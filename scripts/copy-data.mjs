@@ -11,6 +11,7 @@ const widgetOutputDirectory = fileURLToPath(new URL('../dist/widgets/out/', impo
 const widgetBundleAliases = [
   ['dataset-profile', 'next-dataset-profile'],
   ['analysis-plan', 'next-analysis-plan'],
+  ['analysis-confirmation', 'next-analysis-confirmation'],
   ['analysis-results', 'next-analysis-results'],
 ];
 
