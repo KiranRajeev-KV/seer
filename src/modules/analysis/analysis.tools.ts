@@ -18,7 +18,7 @@ export class AnalysisTools {
 
   @Tool({
     name: 'create_analysis_plan',
-    description: 'Validate a proposed supervised-learning plan for an approved Seer dataset. Call profile_dataset first, then require user approval before execution.',
+    description: 'Prepare a safe, reviewable plan for answering a prediction question from an approved dataset. Call profile_dataset first; the user must approve the plan before Seer runs it.',
     inputSchema: createAnalysisPlanInputSchema,
     outputSchema: createAnalysisPlanResponseSchema,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
@@ -37,7 +37,7 @@ export class AnalysisTools {
 
   @Tool({
     name: 'confirm_analysis_plan',
-    description: 'After the user explicitly approves a Seer plan, exchange its review token for an execution token. This verifies signature, expiration, and dataset hash; it does not train a model.',
+    description: 'Record the user’s explicit approval of a Seer plan and make it ready to run. This checks that the approved plan and data have not changed; it does not run the analysis.',
     inputSchema: confirmAnalysisPlanInputSchema,
     annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   })
@@ -53,7 +53,7 @@ export class AnalysisTools {
 
   @Tool({
     name: 'run_analysis',
-    description: 'Execute a Seer regression or classification plan only with an execution token returned after explicit user approval. It verifies the signed token and dataset hash, then trains and evaluates through the ML service.',
+    description: 'Run an approved Seer prediction plan. It uses the selected historical data to produce an explained estimate, comparison, and limitations. It can run only after explicit user approval.',
     inputSchema: runAnalysisInputSchema,
     outputSchema: runAnalysisResponseSchema,
     taskSupport: 'optional',
