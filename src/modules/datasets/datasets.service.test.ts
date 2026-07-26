@@ -18,7 +18,7 @@ test('lists the packaged datasets without exposing their file paths', async () =
     name: 'Employee Attrition',
     description: 'Synthetic employee attrition data with numeric and categorical workplace features.',
     taskHints: ['classification'],
-    rows: 60,
+    rows: 420,
     columns: 6,
   }]);
 });
