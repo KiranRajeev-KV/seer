@@ -20,12 +20,21 @@ CSV or establish causal relationships.
 5. Trains and evaluates the approved plan atomically in the ML service.
 6. Returns evidence, charts, warnings, and prediction coverage to MCP widgets.
 
-The bundled synthetic datasets demonstrate both supported task types:
+The bundled datasets demonstrate both supported task types:
 
 | Dataset | Task | Example target |
 | --- | --- | --- |
 | Employee Compensation | Regression | `annual_salary` |
 | Employee Attrition | Classification | `attrition` |
+| Iris | Classification | `species` |
+| Titanic | Classification | `survived` |
+| Wine | Classification | `cultivar` |
+| Auto MPG | Regression | `mpg` |
+
+Dataset sources, attribution, and intentional preparation are documented in
+[the bundled-datasets guide](docs/datasets.md). Titanic is a historical
+teaching dataset: its results are not causal or suitable for decisions about
+people.
 
 The attrition data is generated from a latent probability rather than a rule, so
 the classes overlap on every feature, a share of rows contradict the trend, and

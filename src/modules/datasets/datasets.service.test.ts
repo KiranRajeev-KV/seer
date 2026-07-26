@@ -6,21 +6,10 @@ test('lists the packaged datasets without exposing their file paths', async () =
   const datasets = new DatasetsService();
   const catalogue = await datasets.list();
 
-  assert.deepEqual(catalogue, [{
-    id: 'employee-compensation',
-    name: 'Employee Compensation',
-    description: 'Synthetic employee compensation data with numeric and categorical features.',
-    taskHints: ['regression'],
-    rows: 1500,
-    columns: 9,
-  }, {
-    id: 'employee-attrition',
-    name: 'Employee Attrition',
-    description: 'Synthetic employee attrition data with numeric and categorical workplace features.',
-    taskHints: ['classification'],
-    rows: 420,
-    columns: 6,
-  }]);
+  assert.deepEqual(catalogue.map(({ id }) => id), [
+    'employee-compensation', 'employee-attrition', 'iris', 'titanic', 'wine', 'auto-mpg',
+  ]);
+  assert.equal(catalogue.every((dataset) => !('fileName' in dataset)), true);
 });
 
 test('reads the compiled CSV asset', async () => {
@@ -36,7 +25,23 @@ test('reads the compiled employee attrition CSV asset', async () => {
   const csv = await datasets.readCsvText('employee-attrition');
 
   assert.match(csv, /^tenure_years,monthly_hours,performance_rating,department,work_arrangement,attrition/);
-  assert.equal(csv.trim().split('\n').length, 61);
+  assert.equal(csv.trim().split('\n').length, 421);
+});
+
+test('reads all classic CSV snapshots with their expected schema and row count', async () => {
+  const datasets = new DatasetsService();
+  const expected = [
+    ['iris', 'sepal_length_cm,sepal_width_cm,petal_length_cm,petal_width_cm,species', 151],
+    ['titanic', 'survived,passenger_class,sex,age,siblings_spouses,parents_children,fare,embarkation_port', 1310],
+    ['wine', 'cultivar,alcohol,malic_acid,ash,alcalinity_of_ash,magnesium,total_phenols', 179],
+    ['auto-mpg', 'mpg,cylinders,displacement,horsepower,weight,acceleration,model_year,origin', 399],
+  ] as const;
+
+  for (const [datasetId, header, lineCount] of expected) {
+    const csv = await datasets.readCsvText(datasetId);
+    assert.match(csv, new RegExp(`^${header}`));
+    assert.equal(csv.trim().split('\n').length, lineCount);
+  }
 });
 
 test('rejects non-allowlisted dataset IDs', async () => {

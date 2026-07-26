@@ -1,10 +1,11 @@
 import { ExecutionContext, Injectable, ToolDecorator as Tool, Widget, z } from '@nitrostack/core';
 import { mlServiceProfileSchema } from '../ml-client/ml-client.schemas.js';
 import { MlClientService, MlServiceError } from '../ml-client/ml-client.service.js';
+import { approvedDatasetIds } from './datasets.types.js';
 import { DatasetsService } from './datasets.service.js';
 
-const profileDatasetInputSchema = z.object({
-  datasetId: z.enum(['employee-compensation', 'employee-attrition']).describe('An approved dataset ID from seer://datasets.'),
+export const profileDatasetInputSchema = z.object({
+  datasetId: z.enum(approvedDatasetIds).describe('An approved dataset ID from seer://datasets.'),
 }).strict();
 
 @Injectable({ deps: [DatasetsService, MlClientService] })

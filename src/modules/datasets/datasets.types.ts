@@ -1,5 +1,16 @@
 import { z } from 'zod';
 
+export const approvedDatasetIds = [
+  'employee-compensation',
+  'employee-attrition',
+  'iris',
+  'titanic',
+  'wine',
+  'auto-mpg',
+] as const;
+
+export const datasetIdSchema = z.enum(approvedDatasetIds);
+
 /**
  * How a target column's values should be shown. Declared per dataset and never
  * inferred: a column named `annual_salary` says nothing about whether its
@@ -15,7 +26,7 @@ export const targetDisplaySchema = z.object({
 export type TargetDisplay = z.infer<typeof targetDisplaySchema>;
 
 export const datasetDefinitionSchema = z.object({
-  id: z.string().regex(/^[a-z0-9-]+$/),
+  id: datasetIdSchema,
   name: z.string().min(1),
   description: z.string().min(1),
   taskHints: z.array(z.enum(['regression', 'classification'])).min(1),

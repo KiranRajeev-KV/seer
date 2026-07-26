@@ -31,3 +31,18 @@ test('serves the employee attrition resource as CSV text', async () => {
 
   assert.match(result, /^tenure_years,monthly_hours,performance_rating,department,work_arrangement,attrition/);
 });
+
+test('serves every classic dataset resource as CSV text', async () => {
+  const resources = new DatasetsResources(new DatasetsService());
+  const cases = [
+    [resources.getIrisCsv.bind(resources), 'seer://datasets/iris', 'sepal_length_cm,sepal_width_cm,petal_length_cm,petal_width_cm,species'],
+    [resources.getTitanicCsv.bind(resources), 'seer://datasets/titanic', 'survived,passenger_class,sex,age,siblings_spouses,parents_children,fare,embarkation_port'],
+    [resources.getWineCsv.bind(resources), 'seer://datasets/wine', 'cultivar,alcohol,malic_acid,ash,alcalinity_of_ash,magnesium,total_phenols'],
+    [resources.getAutoMpgCsv.bind(resources), 'seer://datasets/auto-mpg', 'mpg,cylinders,displacement,horsepower,weight,acceleration,model_year,origin'],
+  ] as const;
+
+  for (const [read, uri, header] of cases) {
+    const result = await read(uri, context);
+    assert.match(result, new RegExp(`^${header}`));
+  }
+});

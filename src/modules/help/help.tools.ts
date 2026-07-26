@@ -6,6 +6,10 @@ import { seerHelpResponseSchema } from './help.schemas.js';
 const exampleQuestions: Record<string, string> = {
   'employee-compensation': 'What annual salary is estimated for an engineer with ten years of experience in Bengaluru?',
   'employee-attrition': 'Is an employee with two years of tenure and high monthly hours likely to leave?',
+  iris: 'Which iris species is estimated from these flower measurements?',
+  titanic: 'What survival category is estimated from this passenger information?',
+  wine: 'Which wine cultivar is estimated from these chemical measurements?',
+  'auto-mpg': 'What fuel economy is estimated for this vehicle?',
 };
 
 @Injectable({ deps: [DatasetsService] })
